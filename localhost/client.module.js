@@ -472,8 +472,8 @@ const app = createApp({
     async mounted() {
             let o_self = this;
             globalThis.o_vue = this;
-            o_self.s_path_folder = '/home/jf18j492/code/yaib/gitignored/jpg'
-            // o_self.s_path_folder = '/home/jf18j492/code/yaib/gitignored/manualpickedunsplash'
+            // o_self.s_path_folder = '/code/yaib/gitignored/jpg'
+            // o_self.s_path_folder = '/code/yaib/gitignored/manualpickedunsplash'
             // Add window event listeners
             // window.addEventListener('pointerdown', this.f_pointerdown);
             window.addEventListener('pointerup', this.f_pointerup);
