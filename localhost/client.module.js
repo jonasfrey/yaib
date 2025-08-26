@@ -11,7 +11,7 @@ import {
 } from "https://deno.land/x/handyhelpers@5.4.2/mod.js"
 
 
-import { createApp, ref, onUpdated } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
+import { createApp, ref, onUpdated, reactive} from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
 
 
 
@@ -27,6 +27,8 @@ f_add_css(
         height: 100vh;
     }
     #inputs{
+        display: flex;
+        flex-wrap: wrap;
         position: absolute;
         top: 0;
         left: 0;
@@ -65,6 +67,16 @@ f_add_css(
         gap: 0.5rem;
         max-height: 80vh;
         overflow-y: auto;
+    }
+    #file_info{
+        position: absolute;
+        top:0;
+        right: 0;
+        z-index: 1;
+        background-color: rgba(0,0,0,0.8);
+        color: rgba(255,255,255,0.8);
+        padding: 0.5rem;
+        border-radius: 0.5rem;      
     }
 
     `
@@ -109,28 +121,34 @@ let f_o_filemeta = function(
     }
 }
 
+let a_o_tag_default = [
+        f_o_tag(1, 0, 'greenery', 'a', '#00ff00'),
+        f_o_tag(2, 1, 'red', 's', '#ff0000'),
+        f_o_tag(3, 2, 'water', 'd', '#0000ff')
+    ]
+let f_o_meta = function(){
+    return {
+        a_o_filemeta: [], 
+        a_o_tag: a_o_tag_default
+    }
+}
+let o_state = reactive({
 
-let o_state = {
-    a_o_tag: [
-        f_o_tag(1, 0, 'to sell', 's', '#00ff00'),
-        f_o_tag(2, 1, 'sold', 'd', '#ff0000'),
-        f_o_tag(3, 2, 'maybe', 'm', '#0000ff'),
-    ],
     o_tag: null,
     a_o_file: [],
-    o_file: {},
+    a_o_file_filtered: [],
+    o_file: null,
     o_filemeta: null,
-    o_meta: {
-        a_o_filemeta: []
-    },
+    o_meta: f_o_meta(),
     b_show_settings: false,
     b_show_shortcut_help: false, 
     s_path_file_current: '',
-    s_path_folder: '/home/jf18j492/Desktop/verkaufen'
-}
+    s_path_folder: '', 
+    s_path_meta_json: '',
+    s_loadingstate_info: '',    
+}) 
 
 globalThis.o_state = o_state
-
 
 
 let f_s_style = function(o_style){
@@ -140,6 +158,7 @@ let f_s_style = function(o_style){
     return s_style;
 }
 
+
 let o = await f_o_html_from_o_js(
     {
         id: "app",
@@ -148,9 +167,16 @@ let o = await f_o_html_from_o_js(
         // "v-on:pointermove": "f_pointermove",
         "v-on:keydown": "f_keydown",
         a_o: [
+
             {
                 id: "inputs",
                 a_o: [
+                    {
+                        id: "loadingstate", 
+                        style: "width: 100%;background-color: rgba(0,0,0,0.8); color: white; padding: 0.5rem 1rem; border-radius: 0.5rem;",
+                        'v-if': "s_loadingstate_info != ''",
+                        innerText: "{{s_loadingstate_info}}",
+                    },
 
                     {
                         s_tag: "label", 
@@ -159,17 +185,18 @@ let o = await f_o_html_from_o_js(
                     {
                         s_tag: "input", 
                         type: "text", 
-                        "v-model": "s_path_folder", 
+                        "v-model.trim": "s_path_folder", 
                         style: "width: 300px;",
                         'v-on:change': 'f_updated_s_path_folder',
                     }, 
                     {
                         s_tag: "button", 
                         'v-on:click': "b_show_settings = !b_show_settings;",
+                        innerText: "⚙️",
                     },
                     {
                         class: "tags", 
-                        'v-for': 'o_tag2 in a_o_tag',
+                        'v-for': 'o_tag2 in o_meta.a_o_tag',
                         a_o: [
                             {
                                 s_tag: "span", 
@@ -183,10 +210,20 @@ let o = await f_o_html_from_o_js(
                             },
                             {
                                 s_tag: "span", 
-                                innerText: '{{(o_tag2.b_filter ? "🔍" : "❌")}}',
-                                'v-on:click': `o_tag2.b_filter = !o_tag2.b_filter;`,
+                                innerText: '🔍',
+                                ":style": `(o_tag2.b_filter) ? 'opacity: 1;' : 'opacity: 0.3;'`,
+                                'v-on:click': `f_update_tag_filter(o_tag2)`,
                             }
                         ]
+                    }
+                ]
+            },
+            {
+                id: "file_info", 
+                a_o: [
+                    {
+                        s_tag: "span", 
+                        innerText: 'File: {{o_file?.name}}',
                     }
                 ]
             },
@@ -200,7 +237,7 @@ let o = await f_o_html_from_o_js(
                         innerText: 'Tags'
                     }, 
                     {
-                        'v-for': 'o_tag2 in a_o_tag',
+                        'v-for': 'o_tag2 in o_meta.a_o_tag',
                         a_o: [
                             {
                                 s_tag: "input", 
@@ -432,14 +469,33 @@ const app = createApp({
     // // Runs after the DOM has updated
     // // this.accessRenderedElement()
     // },
-    mounted() {
-        globalThis.o_vue = this;
-        
-        // Add window event listeners
-        window.addEventListener('pointerdown', this.f_pointerdown);
-        window.addEventListener('pointerup', this.f_pointerup);
-        window.addEventListener('pointermove', this.f_pointermove);
-        window.addEventListener('keydown', this.f_keydown);
+    async mounted() {
+            let o_self = this;
+            globalThis.o_vue = this;
+            o_self.s_path_folder = '/home/jf18j492/code/yaib/gitignored/jpg'
+            // o_self.s_path_folder = '/home/jf18j492/code/yaib/gitignored/manualpickedunsplash'
+            // Add window event listeners
+            // window.addEventListener('pointerdown', this.f_pointerdown);
+            window.addEventListener('pointerup', this.f_pointerup);
+            // window.addEventListener('pointermove', this.f_pointermove);
+            window.addEventListener('keydown', this.f_keydown);
+
+            await o_self.$nextTick(); 
+            o_self.o_meta = await o_self.f_o_meta_data();
+            if(o_self.o_meta?.a_o_tag == undefined){
+                o_self.o_meta.a_o_tag = a_o_tag_default;
+            }
+            for(let o_tag of o_self.o_meta.a_o_tag){
+                o_tag.b_filter = false;
+            }
+        window.setInterval(()=>{
+            o_self.f_o_server_response('/writetextfile',
+            {
+                s_path_abs: o_self.s_path_meta_json,
+                s_text: JSON.stringify(o_self.o_meta)
+            }
+        )
+        },5000)
     },
     beforeUnmount() {
         // Clean up event listeners when component is destroyed
@@ -448,33 +504,116 @@ const app = createApp({
         window.removeEventListener('pointermove', this.f_pointermove);
     },
   methods: {
+    f_s_imgpath_from_o_file: function(o_file){
+        return `filerequest${o_file?.s_path_file}`;
+    },
+    f_pointerup: function(o_event){
+        let o_self = this;
+        o_self.b_show_shortcut_help = false;
+
+        //if click is outside #settings div
+        let o_settings = document.getElementById('settings');
+        if(o_settings && !o_settings.contains(o_event.target)){     
+            o_self.b_show_settings = false;
+        }
+    },
+    f_update_a_o_file_filtered: function(){
+        let o_self = this;
+        let a_n_id_tag_filter = o_self.o_meta.a_o_tag.filter(o=>o.b_filter).map(o=>o.n_id);
+        let a_o = o_self.a_o_file.filter(o_file=>{
+            let b_has_image_ending = o_file.s_path_file.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+            const b_matches_tag_filter = o_self.f_o_file_matches_tags(o_file, a_n_id_tag_filter);
+            // console.log({b_has_image_ending, b_matches_tag_filter})
+
+            return b_has_image_ending && b_matches_tag_filter;
+        })
+        
+        // console.log(a_n_id_tag_filter)
+        if(!o_self.o_file){
+            o_self.o_file = a_o[0];
+        }
+        if(!o_self.f_o_file_matches_tags(o_self.o_file, a_n_id_tag_filter)){
+            o_self.o_file = a_o[0];
+            
+        }
+        o_self.a_o_file_filtered = a_o;
+    },
+    f_o_file_matches_tags: function(o_file, a_n_id_tag_filter){
+        if(a_n_id_tag_filter.length === 0){return true;}
+        return o_file?.o_filemeta?.a_n_id_tag.some(n_id => a_n_id_tag_filter.includes(n_id));
+    },
+    f_update_tag_filter: function(o_tag2){
+        o_tag2.b_filter = !o_tag2.b_filter;
+        // check if current o_file is still in filtered list
+        let o_self = this;
+        o_self.a_o_tag = o_self.a_o_tag; 
+        o_self.f_update_a_o_file_filtered();
+    },
+    f_o_server_response : async function(
+        s_path,
+        o_request_data = {}, 
+        f_error_handler = null
+    ){
+        let o_resp = await fetch(s_path, {
+            method: o_request_data ? 'POST' : 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(o_request_data)
+        });
+        let o_data = await o_resp.json();
+        if(o_data?.o_server_error?.s != ''){
+
+            console.error(o_data.o_server_error.s);
+            console.error(o_data.o_server_error.n);
+            
+        }
+
+        return o_data;
+    },
+    f_o_meta_data : async function(){
+        let o = await this.f_o_server_response('/readtextfile',
+            {
+                s_path_abs: this.s_path_meta_json,
+            }, 
+            null
+        )
+        if(o?.o_server_error?.s.toLowerCase().includes('no such file or directory')){ //todo: check OS specific error message
+            return f_o_meta();
+        }
+        return JSON.parse(o?.o_meta?.s_text);
+    },
+
     f_add_tag: function(){
         let o_self = this;
-        let n_id_tag_hightest = o_self.a_o_tag.reduce((n_acc, o_tag)=>{
+        let n_id_tag_hightest = o_self.o_meta.a_o_tag.reduce((n_acc, o_tag)=>{
             return Math.max(n_acc, o_tag.n_id);
         }, 0);
         let o_tag = f_o_tag(
             n_id_tag_hightest+1, 
-            o_self.a_o_tag.length, 
+            o_self.o_meta.a_o_tag.length, 
             'new tag',
             '',
             '#ff0000'
         )
-        o_self.a_o_tag.push(o_tag);
+        o_self.o_meta.a_o_tag.push(o_tag);
     },
     f_keydown: function(o_event){
         let o_self = this;
         // if right arrow key
         if(o_event.key === "ArrowRight"){
-            o_self.o_file = o_self.a_o_file[(o_self.a_o_file.indexOf(o_self.o_file) + 1) % o_self.a_o_file.length];
+            let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) + 1) % o_self.a_o_file_filtered.length];
+            o_self.o_file = o;
         }
         //if left arrow key
         if(o_event.key === "ArrowLeft"){
-            o_self.o_file = o_self.a_o_file[(o_self.a_o_file.indexOf(o_self.o_file) - 1 + o_self.a_o_file.length) % o_self.a_o_file.length];
+            let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) - 1 + o_self.a_o_file_filtered.length) % o_self.a_o_file_filtered.length];
+            o_self.o_file = o;
         }
         //escape key
         if(o_event.key === "Escape"){
             o_self.b_show_shortcut_help = false;
+            o_self.b_show_settings = false;
         }
         if(o_self.b_show_shortcut_help){
             let o_tag = o_self.o_tag;
@@ -488,7 +627,7 @@ const app = createApp({
         }
         if(!o_self.b_show_shortcut_help && !o_self.b_show_settings){
             //check if key matches any tag shortcut
-            let o_tag = o_self.a_o_tag.find(o=>{
+            let o_tag = o_self.o_meta.a_o_tag.find(o=>{
                 return o.s_shortcut.toLowerCase() == (o_event.ctrlKey ? 'ctrl+' : '') + (o_event.shiftKey ? 'shift+' : '') + (o_event.altKey ? 'alt+' : '') + o_event.key.toLowerCase();
             })
             if(o_tag){
@@ -498,64 +637,86 @@ const app = createApp({
                 }else{
                     o_self.o_filemeta.a_n_id_tag = o_self.o_filemeta.a_n_id_tag.filter(n_id=>{n_id != o_tag.n_id})
                 }
+                o_self.f_o_update_data();
             }
             
         }
     },
-    f_s_path_from_o_file: function(o_file){
-        let s  = `filerequest${o_file?.s_path_file}`;
-        console.log(s)
+
+    f_o_and_handle_server_response: async function(o_resp){
+        let o_data = await o_resp.json();
+        if(o_data?.o_error?.s != ''){
+            console.error(o_data.o_error.s);
+        }
+        return o_data;
     },
     f_updated_s_path_folder:async function(){
-        let o_resp = await fetch('/f_a_o_entry__from_s_path', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                s_path_folder: this.s_path_folder
-            })
-        });
-        let o_data = await o_resp.json();
-        console.log(o_data)
-        this.a_o_file = o_data;
-
+        let o_self = this;
+        let o = await o_self.f_o_server_response(
+            '/f_a_o_entry__from_s_path',
+            {
+                s_path_folder: o_self.s_path_folder
+            }
+        );
+        let a_o =  o?.o_meta?.a_o;
+        // a_o = a_o.slice(0, 100);
+        o_self.a_o_file = a_o;
+        o_self.a_o_file_filtered = a_o;
     }
     },
+
     watch: {
+        
+        // 'o_filemeta': {
+        //     deep: true, 
+        //     handler: function(newVal, oldVal) {
+        //         let o_self = this;
+        //         console.log('o_filemeta changed:', newVal);
+        //         // o_self.f_o_update_data();
+        //     }
+        // },
+        's_path_folder': function(newVal, oldVal) {
+            this.s_path_meta_json = `${newVal}/.o_meta.json`;
+        },
         'a_o_file': function(newVal, oldVal) {
             let o_self = this;
             console.log('a_o_file changed:', newVal);
-            o_self.o_file = this.a_o_file[0];
+            o_self.s_loadingstate_info = `Updating metadata for ${o_self.a_o_file.length} files...`
+            for(let o of o_self.a_o_file){
+                if(o.o_filemeta == undefined){
+                    let o_filemeta = o_self.o_meta.a_o_filemeta.find(o2=>o2.s_path_file_abs == o?.s_path_file);
+                    if(!o_filemeta){
+                            o_filemeta = f_o_filemeta(
+                                o?.s_path_file,
+                                []
+                            );
+                    }
+                    o.o_filemeta = o_filemeta;
+                    o_self.o_meta.a_o_filemeta.push(o.o_filemeta);
 
+                }
+            }
+            o_self.s_loadingstate_info = ''
+            o_self.f_update_a_o_file_filtered();
         }, 
         'o_file': function(newVal, oldVal) {
             let o_self = this;
-            o_self.s_path_file_current = `filerequest${o_self.o_file?.s_path_file}`;
+            o_self.s_path_file_current = o_self.f_s_imgpath_from_o_file(o_self.o_file);
 
             // add tag 
             o_self.o_filemeta = o_self.o_meta.a_o_filemeta.find(o=>o.s_path_file_abs == o_self.o_file?.s_path_file);
-            if(!o_self.o_filemeta){
-                o_self.o_filemeta = f_o_filemeta(
-                    o_self.o_file?.s_path_file,
-                    []
-                );
-                o_self.o_meta.a_o_filemeta.push(o_self.o_filemeta);
-            }
-            o_self.o_file.o_filemeta = o_self.o_filemeta;
+
 
             console.log('o_file changed:', newVal);
-        }, 
-        'a_o_tag': {
-            deep: true,
-            handler(v_new, v_old) {
-                let o_self = this;
-                let a_n_id_tag_filter = o_self.a_o_tag.filter(o=>o.b_filter).map(o=>o.n_id);
-                o_self.a_o_file_filtered = o_self.a_o_file.filter(o_file=>{
-                    return o_file.o_filemeta.a_n_id_tag.some(n_id=>a_n_id_tag_filter.includes(n_id));
-                })
+            let n_idx = o_self.a_o_file.indexOf(o_self.o_file);
+            let n_load_before_and_after = 5;        
+            // load images before and after
+            for(let i = Math.max(0, n_idx - n_load_before_and_after); i <= Math.min(o_self.a_o_file.length - 1, n_idx + n_load_before_and_after); i++){
+                let o_file = o_self.a_o_file_filtered[i];
+                let img = new Image();
+                img.src = o_self.f_s_imgpath_from_o_file(o_file)
             }
-        }
+        }, 
     },
   data() {
     return o_state
@@ -575,4 +736,6 @@ const app = createApp({
 
 app.mount('#app')
 
-window.onpointer
+globalThis.o_self = app
+
+

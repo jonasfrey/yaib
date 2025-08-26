@@ -29,6 +29,51 @@ let a_o_ws_client = []
 //     await ensureDir(s_path_abs_folder_cached_shaders)// deno deploy is read only...
 // }
 
+let f_o_server_response = function(
+    o_server_error, // an object describing the error
+    o_meta // a generic object with any metadata you want to send back
+){
+    return {
+        o_server_error, 
+        o_meta
+    }
+}
+let f_o_server_error = function(
+    s, // a string describing the error, '' if no error
+    n, // an error number, 0 if no error
+
+){
+    return {
+        s, 
+        n, 
+    }
+}
+
+let f_o_response_try_and_catch_response = async function(
+    f_async, // an async function that returns some metadata
+){
+    let o_server_error = f_o_server_error('', 0);
+    let o_meta = {};
+    try {
+        o_meta = await f_async();
+    } catch (error) {
+        o_server_error.s = error.message;
+        o_server_error.n = error.code;
+    }
+    let o = f_o_server_response(
+        o_server_error, 
+        o_meta
+    )
+    return new Response(
+        JSON.stringify(o), 
+        { 
+            headers: {
+                'Content-type': "application/json"
+            }
+        }
+    );  
+
+}
 let f_handler = async function(o_request){
 
     // websocket 'request' handling here
@@ -88,20 +133,30 @@ let f_handler = async function(o_request){
             }
         );
     }
-    if(o_url.pathname == '/f_a_o_entry__from_s_path'){
-        let o_data = await o_request.json();
-        let a_o = await f_a_o_entry__from_s_path(o_data?.s_path_folder.trim());
-        console.log(a_o)
-        return new Response(
-            JSON.stringify(a_o),
-            { 
-                headers: {
-                    'Content-type': "application/json"
+    if(o_url.pathname == '/f_a_o_entry__from_s_path'){ 
+     
+        let o = f_o_response_try_and_catch_response(
+            async function(){
+                let o_data = await o_request.json();
+                let a_o = await f_a_o_entry__from_s_path(o_data?.s_path_folder.trim());
+                a_o = a_o.map(o=>{
+                    return {
+                        s_path_file: o.s_path_file,
+                    }
+                }).filter(o=>{
+                    // only return image files
+                    return o.s_path_file.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+                })
+                return {
+                    a_o
                 }
             }
-        );
+        )
+        return o;
+
     }
     if(o_url.pathname.startsWith('/filerequest')){
+
         let s_path_abs = `/${o_url.pathname.replace('/filerequest/', '')}`;
         s_path_abs = decodeURIComponent(s_path_abs);
         console.log({s_path_abs})
@@ -117,6 +172,37 @@ let f_handler = async function(o_request){
                 }
             }
         );
+    }
+    if(o_url.pathname.startsWith('/readtextfile')){
+
+        let o = f_o_response_try_and_catch_response(
+            async function(){
+                let o_data = await o_request.json();
+                let s_text = await Deno.readTextFile(o_data.s_path_abs);  
+
+                return {
+                    s_text
+                }
+            }
+        )
+        return o;
+    }
+
+    
+    if(o_url.pathname.startsWith('/writetextfile')){
+
+        let o = f_o_response_try_and_catch_response(
+        async function(){
+                let o_data = await o_request.json();
+                await Deno.writeTextFile(o_data.s_path_abs, o_data.s_text);  
+
+                return {
+                    b_writte: true
+                }
+            }
+        )
+        return o;
+
     }
 
     return f_v_before_return_response__fileserver(
