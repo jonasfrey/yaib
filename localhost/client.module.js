@@ -25,6 +25,7 @@ f_add_css(
         left: 0;
         width: 100vw;
         height: 100vh;
+        color:  rgba(255,255,255,0.8);
     }
     #inputs{
         display: flex;
@@ -68,19 +69,63 @@ f_add_css(
         max-height: 80vh;
         overflow-y: auto;
     }
-    #file_info{
-        position: absolute;
-        top:0;
-        right: 0;
-        z-index: 1;
-        background-color: rgba(0,0,0,0.8);
-        color: rgba(255,255,255,0.8);
-        padding: 0.5rem;
-        border-radius: 0.5rem;      
-    }
 
+
+    .overlay{
+        /* an overlay centered with blurred background*/
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0,0,0,0.5);
+        backdrop-filter: blur(5px);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10;
+    }
+    .select_folder{
+        display: flex;
+        flex-direction: column;
+    }
+    .folder_list{
+        background-color: rgba(255,255,255,0.8);
+        padding: 1rem;
+        display:flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+    .flex_row{
+        display: flex;
+        flex-direction: row;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .flex_col{
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .image_info{
+        position:absolute;
+        top:0; 
+        right:0;
+        z-index:1;
+        background-color: rgba(22,22,22,0.8);
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+
+    }
     `
 );
+
+import { 
+    f_o_folderinfo,
+    f_o_toast
+ } from "./functions.module.js";
 
 let f_o_tag = function(
     n_id,
@@ -143,9 +188,13 @@ let o_state = reactive({
     b_show_settings: false,
     b_show_shortcut_help: false, 
     s_path_file_current: '',
-    s_path_folder: '', 
+    o_folderinfo: null,
+    o_folderinfo_prev: null,
     s_path_meta_json: '',
     s_loadingstate_info: '',    
+    b_select_folder_overlay: false,
+    n_id_timeout_saving: null,
+    a_o_toast: [],
 }) 
 
 globalThis.o_state = o_state
@@ -167,7 +216,17 @@ let o = await f_o_html_from_o_js(
         // "v-on:pointermove": "f_pointermove",
         "v-on:keydown": "f_keydown",
         a_o: [
-
+            {
+                id: "toast_container",
+                a_o: [
+                    {
+                        s_tag: "div",
+                        'v-for': 'o_toast of a_o_toast',
+                        ":class": "`toast ${o_toast.s_class}`",
+                        innerText: "{{o_toast.s_message}}",
+                    }
+                ]
+            },
             {
                 id: "inputs",
                 a_o: [
@@ -183,19 +242,88 @@ let o = await f_o_html_from_o_js(
                         innerText: "folder path", 
                     },
                     {
-                        s_tag: "input", 
-                        type: "text", 
-                        "v-model.trim": "s_path_folder", 
-                        style: "width: 300px;",
-                        'v-on:change': 'f_updated_s_path_folder',
-                    }, 
+                        class: "flex_row",
+                        a_o: [
+                            {
+                                // current folder path
+                                s_tag: "span",
+                                innerText: "{{o_folderinfo?.s_path_abs || '/'}} ({{o_folderinfo?.n_items || 0}} items, {{o_folderinfo?.a_o_entry_image.length || 0}} images)"
+                            },
+                            {
+                                s_tag: 'button',
+                                innerText: 'change folder 📂',
+                                'v-on:click':"b_select_folder_overlay = true;", 
+                            }, 
+                        ]
+                    },
+                    {
+                        class: "overlay select_folder",
+                        'v-if': "b_select_folder_overlay",
+                        a_o: [
+                            {
+                                s_tag: "h2",
+                                innerText: "Select a folder"
+                            },
+                            {
+                                'v-on:click': "b_select_folder_overlay = false;f_load_images();",
+                                s_tag: "button",
+                                innerText: "Load images"
+                            },
+                            {
+                                class: 'flex_row',
+                                a_o: [
+                                    {
+                                        s_tag: "button", 
+                                        innerText: "⬅️",
+                                        'v-on:click': 'f_update_o_folderinfo(o_folderinfo_prev.s_path_abs);',
+                                    },
+                                    {
+                                        s_tag: "span",
+                                        innerText: "{{o_folderinfo?.s_path_abs}}"
+                                    }
+                                ]
+                            },
+ 
+                            {
+                                s_tag: "span", 
+                                innerText: "{{o_folderinfo?.a_o_entry_image.length}} image files"
+                            },
+                            {
+                                class: "folder_list",
+                                a_o: [
+                                    {
+                                        'v-for': 'o_folder of o_folderinfo?.a_o_entry_folder',
+                                        s_tag: "a",
+                                        href: "#",
+                                        innerText: "{{o_folder.name}}",
+                                        'v-on:click': 'f_update_o_folderinfo(o_folder.s_path_file);'
+                                    }
+                                ]
+                            }
+                        ]
+                    },
                     {
                         s_tag: "button", 
                         'v-on:click': "b_show_settings = !b_show_settings;",
                         innerText: "⚙️",
                     },
+                    
+                ]
+            },
+            {
+                class: "image_info",
+                a_o: [
                     {
-                        class: "tags", 
+                        id: "file_info", 
+                        a_o: [
+                            {
+                                s_tag: "span", 
+                                innerText: 'File: {{o_file?.name}}',
+                            }
+                        ]
+                    },
+                    {
+                        class: "tags flex_col", 
                         'v-for': 'o_tag2 in o_meta.a_o_tag',
                         a_o: [
                             {
@@ -215,21 +343,12 @@ let o = await f_o_html_from_o_js(
                                 'v-on:click': `f_update_tag_filter(o_tag2)`,
                             }
                         ]
-                    }
+                    },
                 ]
             },
             {
-                id: "file_info", 
-                a_o: [
-                    {
-                        s_tag: "span", 
-                        innerText: 'File: {{o_file?.name}}',
-                    }
-                ]
-            },
-
-            {
-                id: "settings", 
+                id: "settings",
+                class: "overlay",
                 'v-if': "b_show_settings",
                 a_o: [
                     {
@@ -291,163 +410,6 @@ let o = await f_o_html_from_o_js(
                     }
                 ]
             }
-            // {
-            //     class: "inputs", 
-            //     a_o: [
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "{{(b_show_active_layer) ? 'Hide' : 'Show'}} active layer",
-            //                 "v-on:click": `b_show_active_layer = !b_show_active_layer;`,
-            //             },
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "🗑️",
-            //                 "v-on:click": `f_delete_item`,
-            //             },
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "Layer 🔄",
-            //                 "v-on:click": "o_item = a_o_item[(a_o_item.indexOf(o_item) + 1) % a_o_item.length]",
-            //             },
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "+ ✏️",
-            //                 "v-on:click": `b_show_text = true;f_push_text()`,
-            //             },
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "edit ✏️",
-            //                 "v-on:click": `b_show_text = true;`,
-            //             },
-            //             {
-            //                 "v-if": 'b_show_text',
-            //                 s_tag: "div",
-            //                 class: "b_show_text",
-            //                 style: 'display:flex;flex-direction: column;',
-            //                 a_o: [
-            //                     {
-            //                         s_tag: 'input', 
-            //                         type: 'text',
-            //                         "v-model": "s_text",
-            //                         'v-on:input': "if(o_item){o_item.s_text = s_text;}",
-            //                     },
-            //                     {
-            //                         s_tag: "button",
-            //                         innerText: "Font family",
-            //                         'v-on:click': `s_font_family = a_s_font_family[(a_s_font_family.indexOf(s_font_family) + 1) % a_s_font_family.length]; if(o_item){o_item.s_font_family = s_font_family;}`,
-            //                         ":style": f_s_style({
-            //                             fontFamily: '${s_font_family}',
-            //                             fontSize: '1.5rem',
-            //                             fontWeight: 'bold',
-            //                             color: 'black',
-            //                             backgroundColor: 'white',
-            //                             padding: '0.5rem',
-            //                             borderRadius: '0.5rem',
-            //                             border: '1px solid black',
-            //                         }),
-            //                     },
-            //                     {
-            //                         s_tag: "button",
-            //                         innerText: "Colors",
-            //                         'v-on:click': `f_update_text_colors`,
-            //                         ":style": f_s_style({
-            //                             fontFamily: '${s_font_family}',
-            //                             fontSize: '1.5rem',
-            //                             color: '${o_item?.s_color_font}',
-            //                             backgroundColor: '${o_item?.s_color_bg}',
-            //                             borderRadius: '0.5rem',
-            //                             border: '1px solid black',
-            //                         }),
-            //                     },
-            //                     {
-            //                         s_tag: "button",
-            //                         innerText: "Close",
-            //                         "v-on:click": `b_show_text = false;`
-            //                     }
-            //                 ]
-            //             },
-            //             {
-            //                 ref: 'fileInput',
-            //                 style: 'display:none;',
-            //                 s_tag: 'input',
-            //                 type:"file",
-            //                 accept: "image/*",
-            //                 "v-on:change":"f_add_image",
-            //             },
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "Image 📷",
-            //                 "v-on:click": 'f_trigger_file_input',
-            //             },
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "🔍 +",
-            //                 "v-on:click": "f_scale_up",
-            //             },
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "🔍 -",
-            //                 "v-on:click": "f_scale_down",
-            //             }, 
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "▽ Layer",
-            //                 "v-on:click": "f_item_layer_down"
-            //             },
-            //             {
-            //                 s_tag: "button",
-            //                 innerText: "△ Layer",
-            //                 "v-on:click": "f_item_layer_up"
-            //             }, 
-
-            //     ]
-            // },
-            // {
-            //     class: 'a_o_item',
-            //     a_o: [
-            //         {
-            //             'v-for': 'o_item2 in a_o_item',
-            //             a_o: [
-            //                 {
-            //                     'v-if': 'o_item2?.s_src_img != ""',
-            //                     s_tag: "img",
-            //                     ":class":"{item: true,'animated-border': (b_show_active_layer && o_item2 == o_item), 'no-drag': true}",
-            //                     ":style": f_s_style({
-            //                         position: 'absolute',
-            //                         left: '${o_item2.n_trn_x}px',
-            //                         top: '${o_item2.n_trn_y}px',
-            //                         width: '${o_item2.n_scl_x_px_image * o_item2.n_scl_factor}px',
-            //                         height: '${o_item2.n_scl_y_px_image * o_item2.n_scl_factor}px',
-            //                         zIndex: '${a_o_item.indexOf(o_item2)}',
-            //                     }),
-            //                     ":src": 'o_item2?.s_src_img',
-            //                 }, 
-            //                 {
-
-            //                     'v-if': 'o_item2?.s_text != ""',
-            //                     s_tag: "div",
-            //                     ":class":"{item: true,'animated-border': (b_show_active_layer && o_item2 == o_item), 'no-drag': true}",
-            //                     ":style": f_s_style({
-            //                         position: 'absolute',
-            //                         left: '${o_item2.n_trn_x}px',
-            //                         top: '${o_item2.n_trn_y}px',
-            //                         fontSize: '${o_item2.n_size_pixel_outline * o_item2.n_scl_factor}px',
-            //                         padding: '${o_item2.n_size_pixel_outline * o_item2.n_scl_factor/4}px',
-            //                         fontFamily: '${o_item2.s_font_family}',
-            //                         color: '${o_item2.s_color_font}',
-            //                         backgroundColor: '${o_item2.s_color_bg}',
-            //                         borderRadius: '${o_item2.n_size_pixel_outline * o_item2.n_scl_factor/20}px',
-            //                         zIndex: '${a_o_item.indexOf(o_item2)}',
-            //                     }),
-            //                     "innerText": '{{o_item2.s_text}}',
-            //                 }
-            //             ]
-                        
-                        
-            //         },
-
-            //     ]
-            // }
         ]
     }, 
     o_state
@@ -471,9 +433,9 @@ const app = createApp({
     // },
     async mounted() {
             let o_self = this;
-            globalThis.o_vue = this;
-            // o_self.s_path_folder = '/code/yaib/gitignored/jpg'
-            // o_self.s_path_folder = '/code/yaib/gitignored/manualpickedunsplash'
+            globalThis.o_self = this;
+
+
             // Add window event listeners
             // window.addEventListener('pointerdown', this.f_pointerdown);
             window.addEventListener('pointerup', this.f_pointerup);
@@ -481,21 +443,20 @@ const app = createApp({
             window.addEventListener('keydown', this.f_keydown);
 
             await o_self.$nextTick(); 
-            o_self.o_meta = await o_self.f_o_meta_data();
-            if(o_self.o_meta?.a_o_tag == undefined){
-                o_self.o_meta.a_o_tag = a_o_tag_default;
-            }
-            for(let o_tag of o_self.o_meta.a_o_tag){
-                o_tag.b_filter = false;
-            }
-        window.setInterval(()=>{
-            o_self.f_o_server_response('/writetextfile',
-            {
-                s_path_abs: o_self.s_path_meta_json,
-                s_text: JSON.stringify(o_self.o_meta)
-            }
-        )
-        },5000)
+
+            o_self.f_update_o_folderinfo('/');
+            // console.log(o_folderinfo__populated);
+
+            // o_self.o_meta = await o_self.f_o_meta_data();
+            // if(o_self.o_meta?.a_o_tag == undefined){
+            //     o_self.o_meta.a_o_tag = a_o_tag_default;
+            // }
+            // for(let o_tag of o_self.o_meta.a_o_tag){
+            //     o_tag.b_filter = false;
+            // }
+
+
+
     },
     beforeUnmount() {
         // Clean up event listeners when component is destroyed
@@ -504,6 +465,71 @@ const app = createApp({
         window.removeEventListener('pointermove', this.f_pointermove);
     },
   methods: {
+    f_load_images: async function(){
+        //check if json with metadata exists in folder
+        
+        let o_self = this;
+        this.s_path_meta_json = `${o_self.o_folderinfo.s_path_abs}/.yaib_6d10f80a-7248-4e26-8de6-0513ce36a856_o_meta.json`;
+        let o_toast = f_o_toast(`Loading images ...`, 'loading');
+        o_self.a_o_toast.push(o_toast);
+        await o_self.$nextTick();
+        let o_meta = null;
+        let o_resp = await this.f_o_server_response('/readtextfile',
+            {
+                s_path_abs: this.s_path_meta_json,
+            }, 
+            null
+        )
+        if(o_resp?.o_server_error?.s.toLowerCase().includes('no such file or directory')){ //todo: check OS specific error message
+            o_meta = f_o_meta();
+        }else{
+
+            o_meta = JSON.parse(o_resp?.o_meta?.s_text);
+        }
+        debugger
+
+        o_self.a_o_file = o_self.o_folderinfo.a_o_entry_image;
+        o_self.a_o_file_filtered = o_self.a_o_file;
+        o_self.f_next_file();
+        o_self.a_o_toast = o_self.a_o_toast.filter(o=>o != o_toast);
+
+    },
+    f_update_o_folderinfo: async function(s_path_abs){
+        let o_self = this;
+        o_self.o_folderinfo_prev = o_self.o_folderinfo;
+        o_self.o_folderinfo = f_o_folderinfo(
+            s_path_abs,
+        );
+        let o = await o_self.f_o_server_response(
+            '/folderinfo',
+            o_self.o_folderinfo
+        );
+        let o_folderinfo__populated =  o?.o_meta;
+        o_self.o_folderinfo = o_folderinfo__populated;
+    },
+    f_try_to_save: function(){
+        let o_self = this;
+        clearTimeout(o_self.n_id_timeout_saving);
+        o_self.n_id_timeout_saving = setTimeout(async function(){
+            o_self.f_o_server_response('/writetextfile',
+                {
+                    s_path_abs: o_self.s_path_meta_json,
+                    s_text: JSON.stringify(o_self.o_meta)
+                }
+            )
+        }, 1000)
+    },
+    f_next_file: function(){
+        let o_self = this;
+        let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) + 1) % o_self.a_o_file_filtered.length];
+        o_self.o_file = o;
+
+    },
+    f_prev_file: function(){
+        let o_self = this;
+        let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) - 1 + o_self.a_o_file_filtered.length) % o_self.a_o_file_filtered.length];
+        o_self.o_file = o;   
+    },
     f_s_imgpath_from_o_file: function(o_file){
         return `filerequest${o_file?.s_path_file}`;
     },
@@ -571,18 +597,7 @@ const app = createApp({
 
         return o_data;
     },
-    f_o_meta_data : async function(){
-        let o = await this.f_o_server_response('/readtextfile',
-            {
-                s_path_abs: this.s_path_meta_json,
-            }, 
-            null
-        )
-        if(o?.o_server_error?.s.toLowerCase().includes('no such file or directory')){ //todo: check OS specific error message
-            return f_o_meta();
-        }
-        return JSON.parse(o?.o_meta?.s_text);
-    },
+
 
     f_add_tag: function(){
         let o_self = this;
@@ -602,13 +617,13 @@ const app = createApp({
         let o_self = this;
         // if right arrow key
         if(o_event.key === "ArrowRight"){
-            let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) + 1) % o_self.a_o_file_filtered.length];
-            o_self.o_file = o;
+            o_self.f_next_file();
+
         }
         //if left arrow key
         if(o_event.key === "ArrowLeft"){
-            let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) - 1 + o_self.a_o_file_filtered.length) % o_self.a_o_file_filtered.length];
-            o_self.o_file = o;
+            o_self.f_prev_file();
+
         }
         //escape key
         if(o_event.key === "Escape"){
@@ -637,7 +652,8 @@ const app = createApp({
                 }else{
                     o_self.o_filemeta.a_n_id_tag = o_self.o_filemeta.a_n_id_tag.filter(n_id=>{n_id != o_tag.n_id})
                 }
-                o_self.f_o_update_data();
+                o_self.f_try_to_save();
+                
             }
             
         }
@@ -650,34 +666,13 @@ const app = createApp({
         }
         return o_data;
     },
-    f_updated_s_path_folder:async function(){
-        let o_self = this;
-        let o = await o_self.f_o_server_response(
-            '/f_a_o_entry__from_s_path',
-            {
-                s_path_folder: o_self.s_path_folder
-            }
-        );
-        let a_o =  o?.o_meta?.a_o;
-        // a_o = a_o.slice(0, 100);
-        o_self.a_o_file = a_o;
-        o_self.a_o_file_filtered = a_o;
-    }
+
     },
 
     watch: {
         
-        // 'o_filemeta': {
-        //     deep: true, 
-        //     handler: function(newVal, oldVal) {
-        //         let o_self = this;
-        //         console.log('o_filemeta changed:', newVal);
-        //         // o_self.f_o_update_data();
-        //     }
-        // },
-        's_path_folder': function(newVal, oldVal) {
-            this.s_path_meta_json = `${newVal}/.o_meta.json`;
-        },
+
+
         'a_o_file': function(newVal, oldVal) {
             let o_self = this;
             console.log('a_o_file changed:', newVal);

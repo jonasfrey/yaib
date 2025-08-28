@@ -20,6 +20,8 @@ const b_deno_deploy = Deno.env.get("DENO_DEPLOYMENT_ID") !== undefined;
 
 let a_o_ws_client = []
 
+import { f_o_folderinfo } from './localhost/functions.module.js';
+
 // const o_kv = await Deno.openKv();
 // let o_config = await f_o_config();
 // console.log({o_config});
@@ -131,7 +133,31 @@ let f_handler = async function(o_request){
                     'Content-type': "text/html"
                 }
             }
-        );
+        );  
+    }
+    if(o_url.pathname == '/folderinfo'){
+        
+        let o = f_o_response_try_and_catch_response(
+            async function(){
+                let o_data = await o_request.json();
+                let o_folderinfo = f_o_folderinfo(o_data?.s_path_abs.trim());
+                let a_o = await f_a_o_entry__from_s_path(o_folderinfo.s_path_abs.trim());
+
+                console.log(a_o);
+                o_folderinfo.n_items = a_o.length;
+                o_folderinfo.a_o_entry_image = a_o.filter(o=>{
+                    return o.s_path_file.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+                });
+                o_folderinfo.a_o_entry_folder = a_o.filter(o=>{
+                    return o.isFile === false && o.isDirectory === true;
+                });
+                return o_folderinfo
+
+            }
+        )
+        return o;
+
+
     }
     if(o_url.pathname == '/f_a_o_entry__from_s_path'){ 
      

@@ -14,3 +14,34 @@
 // export {
 //     f_n_sum
 // }
+let f_o_toast = function(
+    s_message, 
+    s_class
+){
+    return {
+        s_message,
+        s_class
+    }
+}
+let f_o_folderinfo = function(
+    
+    s_path_abs, 
+    n_size, 
+    n_items, 
+    a_o_entry_folder, 
+    a_o_entry_image
+    
+){
+    return {
+        s_path_abs, 
+        n_size, 
+        n_items, 
+        a_o_entry_folder,  
+        a_o_entry_image
+    }
+
+}
+export {
+    f_o_folderinfo,
+    f_o_toast
+}
