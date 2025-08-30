@@ -29,7 +29,8 @@ let f_o_folderinfo = function(
     n_size, 
     n_items, 
     a_o_entry_folder, 
-    a_o_entry_image
+    a_o_entry_image, 
+    a_o_entry_video
     
 ){
     return {
@@ -37,11 +38,20 @@ let f_o_folderinfo = function(
         n_size, 
         n_items, 
         a_o_entry_folder,  
-        a_o_entry_image
+        a_o_entry_image,
+        a_o_entry_video
     }
 
 }
+let f_b_img_file = function(s_path){
+    return s_path.match(/\.(jpg|jpeg|png|gif)$/i);
+}
+let f_b_video_file = function(s_path){
+    return s_path.match(/\.(mp4|mkv|webm|mov|avi)$/i);
+}
 export {
     f_o_folderinfo,
-    f_o_toast
+    f_o_toast,
+    f_b_img_file,
+    f_b_video_file
 }

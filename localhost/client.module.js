@@ -14,7 +14,10 @@ import {
 import { createApp, ref, onUpdated, reactive} from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
 
 
-
+import {
+    f_b_img_file,
+    f_b_video_file
+} from "./functions.module.js"
 f_add_css(
     `   
     #app{
@@ -41,20 +44,22 @@ f_add_css(
         flex-direction: row;
         gap: 0.5rem;
     }
-    .image_container{
+    .file_container{
         position: absolute;
         top:0;
         left:0;
         width: 100%;
         height: 100%;
     }
-    .image_container img{
+    .file_container img,
+    .file_container video{
         width: 100%;
         height: 100%;
         object-fit: contain;       /* like background-size: contain */
         object-position: center; /* like background-position: center */
         display: block;
     }
+
     #settings{
         position: absolute;
         top: 3rem;
@@ -265,9 +270,9 @@ let o = await f_o_html_from_o_js(
                                 innerText: "Select a folder"
                             },
                             {
-                                'v-on:click': "b_select_folder_overlay = false;f_load_images();",
+                                'v-on:click': "b_select_folder_overlay = false;f_load_files();",
                                 s_tag: "button",
-                                innerText: "Load images"
+                                innerText: "Load files"
                             },
                             {
                                 class: 'flex_row',
@@ -400,12 +405,19 @@ let o = await f_o_html_from_o_js(
                 ]
             },
             {
-                class: "image_container", 
+                class: "file_container", 
 
                 a_o: [
                     {
                         s_tag: "img", 
-                        "v-if": "o_file",
+                        "v-if": "o_file && f_b_img_file(o_file.s_path_file)",
+                        ":src": "s_path_file_current",
+                    },
+                    {
+                        s_tag: "video", 
+                        'controls': "true",
+                        "preload" : "auto",
+                        "v-if": "o_file && f_b_video_file(o_file.s_path_file)",
                         ":src": "s_path_file_current",
                     }
                 ]
@@ -465,12 +477,18 @@ const app = createApp({
         window.removeEventListener('pointermove', this.f_pointermove);
     },
   methods: {
-    f_load_images: async function(){
+    f_b_img_file: function(s_path_file){
+        return f_b_img_file(s_path_file);
+    },
+    f_b_video_file: function(s_path_file){
+        return f_b_video_file(s_path_file);
+    },
+    f_load_files: async function(){
         //check if json with metadata exists in folder
         
         let o_self = this;
         this.s_path_meta_json = `${o_self.o_folderinfo.s_path_abs}/.yaib_6d10f80a-7248-4e26-8de6-0513ce36a856_o_meta.json`;
-        let o_toast = f_o_toast(`Loading images ...`, 'loading');
+        let o_toast = f_o_toast(`Loading files ...`, 'loading');
         o_self.a_o_toast.push(o_toast);
         await o_self.$nextTick();
         let o_meta = null;
@@ -486,9 +504,8 @@ const app = createApp({
 
             o_meta = JSON.parse(o_resp?.o_meta?.s_text);
         }
-        debugger
 
-        o_self.a_o_file = o_self.o_folderinfo.a_o_entry_image;
+        o_self.a_o_file = o_self.o_folderinfo.a_o_entry_image.concat(o_self.o_folderinfo.a_o_entry_video);
         o_self.a_o_file_filtered = o_self.a_o_file;
         o_self.f_next_file();
         o_self.a_o_toast = o_self.a_o_toast.filter(o=>o != o_toast);
@@ -530,7 +547,7 @@ const app = createApp({
         let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) - 1 + o_self.a_o_file_filtered.length) % o_self.a_o_file_filtered.length];
         o_self.o_file = o;   
     },
-    f_s_imgpath_from_o_file: function(o_file){
+    f_s_path_from_o_file: function(o_file){
         return `filerequest${o_file?.s_path_file}`;
     },
     f_pointerup: function(o_event){
@@ -547,11 +564,10 @@ const app = createApp({
         let o_self = this;
         let a_n_id_tag_filter = o_self.o_meta.a_o_tag.filter(o=>o.b_filter).map(o=>o.n_id);
         let a_o = o_self.a_o_file.filter(o_file=>{
-            let b_has_image_ending = o_file.s_path_file.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
             const b_matches_tag_filter = o_self.f_o_file_matches_tags(o_file, a_n_id_tag_filter);
             // console.log({b_has_image_ending, b_matches_tag_filter})
 
-            return b_has_image_ending && b_matches_tag_filter;
+            return b_matches_tag_filter;
         })
         
         // console.log(a_n_id_tag_filter)
@@ -696,7 +712,7 @@ const app = createApp({
         }, 
         'o_file': function(newVal, oldVal) {
             let o_self = this;
-            o_self.s_path_file_current = o_self.f_s_imgpath_from_o_file(o_self.o_file);
+            o_self.s_path_file_current = o_self.f_s_path_from_o_file(o_self.o_file);
 
             // add tag 
             o_self.o_filemeta = o_self.o_meta.a_o_filemeta.find(o=>o.s_path_file_abs == o_self.o_file?.s_path_file);
@@ -709,7 +725,7 @@ const app = createApp({
             for(let i = Math.max(0, n_idx - n_load_before_and_after); i <= Math.min(o_self.a_o_file.length - 1, n_idx + n_load_before_and_after); i++){
                 let o_file = o_self.a_o_file_filtered[i];
                 let img = new Image();
-                img.src = o_self.f_s_imgpath_from_o_file(o_file)
+                img.src = o_self.f_s_path_from_o_file(o_file)
             }
         }, 
     },

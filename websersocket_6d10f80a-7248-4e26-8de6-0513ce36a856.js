@@ -20,7 +20,11 @@ const b_deno_deploy = Deno.env.get("DENO_DEPLOYMENT_ID") !== undefined;
 
 let a_o_ws_client = []
 
-import { f_o_folderinfo } from './localhost/functions.module.js';
+import { 
+    f_o_folderinfo,
+    f_b_img_file,
+    f_b_video_file
+ } from './localhost/functions.module.js';
 
 // const o_kv = await Deno.openKv();
 // let o_config = await f_o_config();
@@ -146,7 +150,10 @@ let f_handler = async function(o_request){
                 console.log(a_o);
                 o_folderinfo.n_items = a_o.length;
                 o_folderinfo.a_o_entry_image = a_o.filter(o=>{
-                    return o.s_path_file.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+                    return f_b_img_file(o.name);
+                });
+                o_folderinfo.a_o_entry_video = a_o.filter(o=>{
+                    return f_b_video_file(o.name);
                 });
                 o_folderinfo.a_o_entry_folder = a_o.filter(o=>{
                     return o.isFile === false && o.isDirectory === true;
@@ -159,28 +166,7 @@ let f_handler = async function(o_request){
 
 
     }
-    if(o_url.pathname == '/f_a_o_entry__from_s_path'){ 
-     
-        let o = f_o_response_try_and_catch_response(
-            async function(){
-                let o_data = await o_request.json();
-                let a_o = await f_a_o_entry__from_s_path(o_data?.s_path_folder.trim());
-                a_o = a_o.map(o=>{
-                    return {
-                        s_path_file: o.s_path_file,
-                    }
-                }).filter(o=>{
-                    // only return image files
-                    return o.s_path_file.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
-                })
-                return {
-                    a_o
-                }
-            }
-        )
-        return o;
 
-    }
     if(o_url.pathname.startsWith('/filerequest')){
 
         let s_path_abs = `/${o_url.pathname.replace('/filerequest/', '')}`;
@@ -189,15 +175,78 @@ let f_handler = async function(o_request){
         let o_file = await Deno.stat(s_path_abs);
         console.log({o_file})
         let o_file_handle = await Deno.open(s_path_abs, {read: true});
-        return new Response(
-            o_file_handle.readable,
-            { 
-                headers: {
-                    'Content-type': "image/jpeg",
-                    'Content-Length': o_file.size.toString(),
-                }
+        let o_map = {
+            'jpg': "image/jpeg",
+            'jpeg': "image/jpeg",
+            'png': "image/png",
+            'gif': "image/gif",
+            'webp': "image/webp",
+            'bmp': "image/bmp",
+
+            'mp4': "video/mp4",
+            'mov': "video/quicktime",
+            'avi': "video/x-msvideo",
+            'mkv': 'video/x-matroska'
+
+        }
+        let s_mime = o_map[s_path_abs.split('.').pop()] || 'application/octet-stream';
+         // Add HTTP Range support so the browser can seek in the video
+ const s_range = o_request.headers.get('range');
+ if (s_range) {
+   // Example: "bytes=START-END"
+   const m = /bytes=(\d*)-(\d*)/.exec(s_range);
+   let n_start = 0;
+   let n_end = o_file.size - 1;
+   if (m) {
+     if (m[1] !== "") n_start = Number(m[1]);
+     if (m[2] !== "") n_end = Number(m[2]);
+   }
+   // sanity clamp
+   n_start = Math.max(0, Math.min(n_start, o_file.size - 1));
+   n_end = Math.max(n_start, Math.min(n_end, o_file.size - 1));
+   const n_len = n_end - n_start + 1;
+
+   await o_file_handle.seek(n_start, Deno.SeekMode.Start);
+
+   let n_remaining = n_len;
+   const rs = new ReadableStream({
+     async pull(controller) {
+       const chunk = new Uint8Array(Math.min(64 * 1024, n_remaining));
+       const n = await o_file_handle.read(chunk);
+       if (n === null || n === 0) {
+         controller.close();
+         o_file_handle.close();
+         return;
+       }
+       n_remaining -= n;
+       controller.enqueue(chunk.subarray(0, n));
+       if (n_remaining <= 0) {
+         controller.close();
+         o_file_handle.close();
+       }
+     },
+     cancel() { try { o_file_handle.close(); } catch {} }
+   });
+
+   return new Response(rs, {
+     status: 206,
+     headers: {
+       'Content-Type': s_mime,
+       'Accept-Ranges': 'bytes',
+       'Content-Length': n_len.toString(),
+       'Content-Range': `bytes ${n_start}-${n_end}/${o_file.size}`,
+     }
+   });
+ }
+
+
+        return new Response(o_file_handle.readable, { 
+            headers: {
+                'Content-Type': s_mime,
+                'Content-Length': o_file.size.toString(),
+                'Accept-Ranges': 'bytes',
             }
-        );
+        });
     }
     if(o_url.pathname.startsWith('/readtextfile')){
 
