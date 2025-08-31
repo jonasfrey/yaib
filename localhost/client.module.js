@@ -124,6 +124,23 @@ f_add_css(
         border-radius: 0.5rem;
 
     }
+    .a_o_timestampsection_video{
+        position:absolute;
+        top: 0; 
+        left: 0;
+        width:100%;
+        height: 20%;
+        top:80%;
+        z-index:2;
+        pointer-events: none;
+    }
+    .o_timestampsection_video{
+        position: absolute; 
+        opacity: 0.5;
+        height: 10px;
+        background: red; 
+        border: 1px solid yellow;
+    }
     `
 );
 
@@ -132,6 +149,17 @@ import {
     f_o_toast
  } from "./functions.module.js";
 
+let f_o_timestampsection_video = function(
+    n_ms_start, 
+    n_ms_end,
+    a_n_id_tag
+){
+    return {
+        n_ms_start, 
+        n_ms_end,
+        a_n_id_tag
+    }
+}
 let f_o_tag = function(
     n_id,
     n_idx,
@@ -179,7 +207,8 @@ let a_o_tag_default = [
 let f_o_meta = function(){
     return {
         a_o_filemeta: [], 
-        a_o_tag: a_o_tag_default
+        a_o_tag: a_o_tag_default, 
+        a_o_timestampsection_video: []
     }
 }
 let o_state = reactive({
@@ -188,6 +217,7 @@ let o_state = reactive({
     a_o_file: [],
     a_o_file_filtered: [],
     o_file: null,
+    o_timestampsection_video: null,
     o_filemeta: null,
     o_meta: f_o_meta(),
     b_show_settings: false,
@@ -200,6 +230,8 @@ let o_state = reactive({
     b_select_folder_overlay: false,
     n_id_timeout_saving: null,
     a_o_toast: [],
+    n_id_interval_playing: null,
+    n_ms_video: 0,
 }) 
 
 globalThis.o_state = o_state
@@ -414,11 +446,50 @@ let o = await f_o_html_from_o_js(
                         ":src": "s_path_file_current",
                     },
                     {
-                        s_tag: "video", 
-                        'controls': "true",
-                        "preload" : "auto",
                         "v-if": "o_file && f_b_video_file(o_file.s_path_file)",
-                        ":src": "s_path_file_current",
+                        class: "a_o_timestampsection_video",
+                        a_o: [
+                            {
+                                'innerText': "timestamp (t)"
+                            },
+                            {
+                                class: "o_timestampsection_video",
+                                "v-for": 'o_timestampsection_video of o_filemeta.a_o_timestampsection_video',
+                                ":style": `f_s_css_from_o_timestampsection_video(o_timestampsection_video)`, 
+                                "a_o": [
+                                    {
+                                        // a_o: [
+                                        //     {
+                                        //         "v-for": "n_id_tag of o_timestampsection_video.a_n_id_tag",
+                                        //         ":style": '`background: ${a_o_tag.find(o=>{return o.n_id == n_id_tag}).s_color}`',
+                                        //     }
+                                        // ]
+                                    }
+                                   
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "v-if": "o_file && f_b_video_file(o_file.s_path_file)",
+                        a_o: [
+                            {
+                                s_tag: "video", 
+                                // 'controls': "true",
+                                "preload" : "auto",
+                                ":src": "s_path_file_current",
+                            },
+                            {
+                                s_tag: 'button', 
+                                innerText: '{{(n_id_interval_playing == null) ? "Play" : "Pause"}}', 
+                                'v-on:click': `f_toggle_play_pause()`,
+                            }, 
+                            {
+                                class: "o_progress_bar",
+                                "v-if": "o_video",
+                                ":style": '`width:${(n_ms_video/o_video.duration * 1000)*100}%; height: 20px; background:blue;`'
+                            }
+                        ]
                     }
                 ]
             }
@@ -446,14 +517,20 @@ const app = createApp({
     async mounted() {
             let o_self = this;
             globalThis.o_self = this;
+            o_self.o_video = null;
+            
 
 
             // Add window event listeners
             // window.addEventListener('pointerdown', this.f_pointerdown);
-            window.addEventListener('pointerup', this.f_pointerup);
+            document.addEventListener('pointerup', this.f_pointerup);
             // window.addEventListener('pointermove', this.f_pointermove);
-            window.addEventListener('keydown', this.f_keydown);
+            document.addEventListener('keydown', this.f_keydown);
 
+            // window keydown event is not triggered when video elemetn is in focus (after there was a seek event)
+            // so we have to 
+
+            
             await o_self.$nextTick(); 
 
             o_self.f_update_o_folderinfo('/');
@@ -477,6 +554,32 @@ const app = createApp({
         window.removeEventListener('pointermove', this.f_pointermove);
     },
   methods: {
+    f_toggle_play_pause: function(){
+        let o_self = this;
+        if(o_self.n_id_interval_playing == null){
+            o_self.o_video.play();
+            o_self.n_id_interval_playing = setInterval(function(){
+                o_self.n_ms_video = o_self.o_video.currentTime * 1000;
+            }, 333);
+        }else{
+            clearInterval(o_self.n_id_interval_playing);
+            o_self.n_id_interval_playing = null;
+        }
+    },
+    f_s_css_from_o_timestampsection_video: function(o_timestampsection_video){
+        let o_self = this;
+        //'`background: ${o_timestampsection_video.o_tag.s_color};left: ${((o_timestampsection_video.n_ms/1000)/o_video.duration)*100}%`', 
+        let s_width = "10px";
+        if(o_timestampsection_video.n_ms_end > o_timestampsection_video.n_ms_start) {
+            s_width = `${((o_timestampsection_video.n_ms_end/1000)/o_self.o_video.duration)*100 - ((o_timestampsection_video.n_ms_start/1000)/o_self.o_video.duration)*100}%`;
+        }
+        let s =  [
+            // `backgro/und: ${o_timestampsection_video.o_tag.s_color}`,
+            `left: ${((o_timestampsection_video.n_ms_start/1000)/o_self.o_video.duration)*100}%`, 
+            `width: ${s_width}`
+        ].join(';')
+        return s
+    },
     f_b_img_file: function(s_path_file){
         return f_b_img_file(s_path_file);
     },
@@ -536,8 +639,15 @@ const app = createApp({
             )
         }, 1000)
     },
+    f_next_timestamp: function(){
+
+    },
+    f_prev_timestamp: function(){
+
+    },
     f_next_file: function(){
         let o_self = this;
+        globalThis.o_self = this;
         let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) + 1) % o_self.a_o_file_filtered.length];
         o_self.o_file = o;
 
@@ -558,6 +668,12 @@ const app = createApp({
         let o_settings = document.getElementById('settings');
         if(o_settings && !o_settings.contains(o_event.target)){     
             o_self.b_show_settings = false;
+        }
+        let n_x_nor = o_event.clientX/window.innerWidth;
+        if(o_self.o_video){
+            o_self.o_video.pause();
+            o_self.o_video.currentTime = n_x_nor * o_self.o_video.duration;
+            o_self.o_video.play();
         }
     },
     f_update_a_o_file_filtered: function(){
@@ -631,6 +747,8 @@ const app = createApp({
     },
     f_keydown: function(o_event){
         let o_self = this;
+        let o_filemeta = o_self.o_filemeta;
+
         // if right arrow key
         if(o_event.key === "ArrowRight"){
             o_self.f_next_file();
@@ -663,16 +781,46 @@ const app = createApp({
             })
             if(o_tag){
                 //add tag
-                if(!o_self.o_filemeta.a_n_id_tag.includes(o_tag.n_id)){
-                    o_self.o_filemeta.a_n_id_tag.push(o_tag.n_id);
-                }else{
-                    o_self.o_filemeta.a_n_id_tag = o_self.o_filemeta.a_n_id_tag.filter(n_id=>{n_id != o_tag.n_id})
+                if(o_self.f_b_img_file(o_filemeta.s_path_file_abs)){
+                    if(!o_filemeta.a_n_id_tag.includes(o_tag.n_id)){
+                        o_filemeta.a_n_id_tag.push(o_tag.n_id);
+                    }else{
+                        o_filemeta.a_n_id_tag = o_filemeta.a_n_id_tag.filter(n_id=>{n_id != o_tag.n_id})
+                    }
                 }
+                // if video file, check if current time is inside of two timestamps, if so 
+                // add the tag to the timestamp
                 o_self.f_try_to_save();
+
                 
             }
             
         }
+        if(o_event.key === "t"){
+            // keydown event not triggered when video is in focus
+         
+            // add timestamp
+            if(o_self.o_video && o_self.f_b_video_file(o_filemeta.s_path_file_abs)){
+                if(o_filemeta.a_o_timestampsection_video == undefined){
+                    o_filemeta.a_o_timestampsection_video = [];
+                }
+                let o_timestampsection_video__last = o_filemeta.a_o_timestampsection_video.at(-1);
+                if(o_timestampsection_video__last && o_timestampsection_video__last.n_ms_end == null){
+                    o_timestampsection_video__last.n_ms_end = o_self.o_video.currentTime * 1000;
+                }else{
+                    o_filemeta.a_o_timestampsection_video.push(
+                        f_o_timestampsection_video(
+                            o_self.o_video.currentTime * 1000,
+                            null,
+                            []
+                        )
+                    );
+                }
+            }
+            o_self.f_try_to_save();
+
+        }
+
     },
 
     f_o_and_handle_server_response: async function(o_resp){
@@ -687,7 +835,6 @@ const app = createApp({
 
     watch: {
         
-
 
         'a_o_file': function(newVal, oldVal) {
             let o_self = this;
@@ -727,7 +874,14 @@ const app = createApp({
                 let img = new Image();
                 img.src = o_self.f_s_path_from_o_file(o_file)
             }
-        }, 
+
+        },
+        's_path_file_current': async function(){
+            let o_self = this;
+            await o_self.$nextTick();
+            o_self.o_video = document.querySelector('video');
+            debugger
+        } 
     },
   data() {
     return o_state
