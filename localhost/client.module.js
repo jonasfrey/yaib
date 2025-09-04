@@ -18,120 +18,29 @@ import {
     f_b_img_file,
     f_b_video_file
 } from "./functions.module.js"
+let s_css = await fetch('./main.css');
+s_css = await s_css.text();
 f_add_css(
-    `   
-    #app{
-        /* a nice almost black gradient background*/
-        background: radial-gradient(circle, rgba(30,30,30,1) 0%, rgba(10,10,10,1) 100%);
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        color:  rgba(255,255,255,0.8);
-    }
-    #inputs{
-        display: flex;
-        flex-wrap: wrap;
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 1;
-        background-color: rgba(255,255,255,0.8);
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        display: flex;
-        flex-direction: row;
-        gap: 0.5rem;
-    }
-    .file_container{
-        position: absolute;
-        top:0;
-        left:0;
-        width: 100%;
-        height: 100%;
-    }
-    .file_container img,
-    .file_container video{
-        width: 100%;
-        height: 100%;
-        object-fit: contain;       /* like background-size: contain */
-        object-position: center; /* like background-position: center */
-        display: block;
-    }
-
-    #settings{
-        position: absolute;
-        top: 3rem;
-        left: 0;
-        z-index: 1;
-        background-color: rgba(255,255,255,0.8);
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-        max-height: 80vh;
-        overflow-y: auto;
-    }
-
-
-    .overlay{
-        /* an overlay centered with blurred background*/
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: rgba(0,0,0,0.5);
-        backdrop-filter: blur(5px);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 10;
-    }
-    .select_folder{
-        display: flex;
-        flex-direction: column;
-    }
-    .folder_list{
-        background-color: rgba(255,255,255,0.8);
-        padding: 1rem;
-        display:flex;
-        flex-direction: column;
-        gap: 0.5rem;
-        max-height: 80vh;
-        overflow-y: auto;
-    }
-    .flex_row{
-        display: flex;
-        flex-direction: row;
-        gap: 0.5rem;
-        align-items: center;
-    }
-    .flex_col{
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    .image_info{
-        position:absolute;
-        top:0; 
-        right:0;
-        z-index:1;
-        background-color: rgba(22,22,22,0.8);
-        padding: 0.5rem;
-        border-radius: 0.5rem;
-
-    }
-    `
+    s_css
 );
 
 import { 
     f_o_folderinfo,
     f_o_toast
  } from "./functions.module.js";
+import { readableTextColor } from "./color.js";
 
+let f_o_timestampsection_video = function(
+    n_ms_start, 
+    n_ms_end,
+    a_n_id_tag
+){
+    return {
+        n_ms_start, 
+        n_ms_end,
+        a_n_id_tag
+    }
+}
 let f_o_tag = function(
     n_id,
     n_idx,
@@ -179,19 +88,22 @@ let a_o_tag_default = [
 let f_o_meta = function(){
     return {
         a_o_filemeta: [], 
-        a_o_tag: a_o_tag_default
+        a_o_tag: a_o_tag_default, 
+        a_o_timestampsection_video: []
     }
 }
 let o_state = reactive({
-
+    b_filter_timestampsection: false,
     o_tag: null,
     a_o_file: [],
     a_o_file_filtered: [],
     o_file: null,
+    o_timestampsection_video: null,
     o_filemeta: null,
     o_meta: f_o_meta(),
     b_show_settings: false,
-    b_show_shortcut_help: false, 
+    s_shortcut_help: '',
+    s_shortcut_timestamp: 't', 
     s_path_file_current: '',
     o_folderinfo: null,
     o_folderinfo_prev: null,
@@ -200,6 +112,10 @@ let o_state = reactive({
     b_select_folder_overlay: false,
     n_id_timeout_saving: null,
     a_o_toast: [],
+    b_playing: false,
+    n_id_interval_playing: null,
+    n_ms_video: 0,
+    n_ms_video_monitor: 0,
 }) 
 
 globalThis.o_state = o_state
@@ -233,7 +149,8 @@ let o = await f_o_html_from_o_js(
                 ]
             },
             {
-                id: "inputs",
+                class: "posabs flex_row",
+                style: 'z-index:32', 
                 a_o: [
                     {
                         id: "loadingstate", 
@@ -243,32 +160,18 @@ let o = await f_o_html_from_o_js(
                     },
 
                     {
-                        s_tag: "label", 
-                        innerText: "folder path", 
-                    },
-                    {
-                        class: "flex_row",
                         a_o: [
                             {
-                                // current folder path
-                                s_tag: "span",
-                                innerText: "{{o_folderinfo?.s_path_abs || '/'}} ({{o_folderinfo?.n_items || 0}} items, {{o_folderinfo?.a_o_entry_image.length || 0}} images)"
-                            },
-                            {
                                 s_tag: 'button',
-                                innerText: 'change folder 📂',
+                                innerText: '📂',
                                 'v-on:click':"b_select_folder_overlay = true;", 
                             }, 
                         ]
                     },
                     {
-                        class: "overlay select_folder",
+                        class: "overlay",
                         'v-if': "b_select_folder_overlay",
                         a_o: [
-                            {
-                                s_tag: "h2",
-                                innerText: "Select a folder"
-                            },
                             {
                                 'v-on:click': "b_select_folder_overlay = false;f_load_files();",
                                 s_tag: "button",
@@ -296,10 +199,10 @@ let o = await f_o_html_from_o_js(
  
                             {
                                 s_tag: "span", 
-                                innerText: "{{o_folderinfo?.a_o_entry_image.length}} image files"
+                                innerText: "{{o_folderinfo?.a_o_entry_image?.length}} images | {{o_folderinfo?.a_o_entry_video?.length}} videos"
                             },
                             {
-                                class: "folder_list",
+                                class: "folder_list flex_col",
                                 a_o: [
                                     {
                                         'v-for': 'o_folder of o_folderinfo?.a_o_entry_folder',
@@ -317,40 +220,51 @@ let o = await f_o_html_from_o_js(
                         'v-on:click': "b_show_settings = !b_show_settings;",
                         innerText: "⚙️",
                     },
+                    {
+                        s_tag: "button", 
+                        'v-on:click': "f_export_video()",
+                        innerText: "📤",
+                    },
+                    {
+                        s_tag: "button", 
+                        'v-on:click': "f_filter_timestampsection()",
+                        innerText: "🔍",
+                    },
                     
                 ]
             },
             {
-                class: "image_info",
+                style: 'position:absolute;right: 0;',
                 a_o: [
                     {
                         id: "file_info", 
                         a_o: [
                             {
                                 s_tag: "span", 
-                                innerText: 'File: {{o_file?.name}}',
+                                innerText: '{{o_file?.name}}',
                             }
                         ]
                     },
                     {
-                        class: "tags flex_col", 
+                        class: "tag flex_row", 
                         'v-for': 'o_tag2 in o_meta.a_o_tag',
                         a_o: [
+                            {
+                                s_tag: "span", 
+                                innerText: '🔍',
+                                ":style": `(o_tag2.b_filter) ? 'opacity: 1;' : 'opacity: 0.3;'`,
+                                'v-on:click': `f_update_tag_filter(o_tag2)`,
+                            },
                             {
                                 s_tag: "span", 
                                 ":style": f_s_style({
                                     display: 'inline-block',
                                     padding: '0.2rem 0.5rem',
                                     backgroundColor: '${o_tag2.s_color}',
+                                    font: 'readableTextColor(o_tag2.s_color)',
                                     opacity: '${o_filemeta?.a_n_id_tag.includes(o_tag2.n_id) ? 1 : 0.3}',
                                 }), 
                                 innerText: '{{o_tag2.s_name}}({{o_tag2.s_shortcut}})',
-                            },
-                            {
-                                s_tag: "span", 
-                                innerText: '🔍',
-                                ":style": `(o_tag2.b_filter) ? 'opacity: 1;' : 'opacity: 0.3;'`,
-                                'v-on:click': `f_update_tag_filter(o_tag2)`,
                             }
                         ]
                     },
@@ -358,7 +272,6 @@ let o = await f_o_html_from_o_js(
             },
             {
                 id: "settings",
-                class: "overlay",
                 'v-if': "b_show_settings",
                 a_o: [
                     {
@@ -378,7 +291,7 @@ let o = await f_o_html_from_o_js(
                                 type: "button",
                                 "v-model": "o_tag2.s_shortcut",
                                 placeholder: 'Shortcut',
-                                'v-on:click': `b_show_shortcut_help = true;o_tag = o_tag2;`,
+                                'v-on:click':'s_shortcut_help = `Enter Key(combination) for ${o_tag2.s_name}`;o_tag = o_tag2;',
                             }, 
                             {
                                 s_tag: 'input', 
@@ -393,17 +306,29 @@ let o = await f_o_html_from_o_js(
                         ]
                     }, 
                     {
+                        s_tag: "label", 
+                        innerText: "timestamp shortcut:"
+                    },
+                    {
+                        s_tag: "input", 
+                        type: "button",
+                        "v-model": "s_shortcut_timestamp",
+                        placeholder: 'Shortcut',
+                        'v-on:click': 's_shortcut_help = `Enter Key(combination) for timestamp`'
+                    }, 
+                    {
                         class: "shortcut_help",
-                        'v-if': "b_show_shortcut_help",
+                        'v-if': "s_shortcut_help !== ''",
                         a_o: [
                             {
                                 s_tag: "p",
-                                innerText: "Enter Key(combination) for '{{o_tag.s_name}}'"
+                                innerText: "{{s_shortcut_help}}"
                             }
                         ]
                     },
                     {
                         s_tag: 'button', 
+                        class: 'w100',
                         'innerText': '+ Add tag',
                         'v-on:click': `f_add_tag()`,
                     }
@@ -418,12 +343,77 @@ let o = await f_o_html_from_o_js(
                         "v-if": "o_file && f_b_img_file(o_file.s_path_file)",
                         ":src": "s_path_file_current",
                     },
+                    
                     {
-                        s_tag: "video", 
-                        'controls': "true",
-                        "preload" : "auto",
                         "v-if": "o_file && f_b_video_file(o_file.s_path_file)",
-                        ":src": "s_path_file_current",
+                        class: "pos_abs_100_100 video_container",
+                        a_o: [
+                            {
+                                s_tag: "video", 
+                                // 'controls': "true",
+                                "preload" : "auto",
+                                ":src": "s_path_file_current",
+                            }, 
+                            {
+                                class: "video_controls",
+                                "v-if": "o_video != null",
+                                a_o: [
+                                    {
+                                        class: "w100", 
+                                        a_o: [
+                                            {
+                                                s_tag: 'button', 
+                                                innerText: '{{(b_playing == false) ? "Play" : "Pause"}}', 
+                                                'v-on:click': `f_toggle_play_pause()`,
+                                            },
+                                            {
+                                                s_tag: 'button', 
+                                                innerText: '<<3', 
+                                                'v-on:click': `f_add_current_time_ms(-3333)`,
+                                            },
+                                            {
+                                                s_tag: 'button', 
+                                                innerText: '3>>', 
+                                                'v-on:click': `f_add_current_time_ms(3333)`,
+                                            },
+                                        ]
+                                    },
+                                    {
+                                        class: "w100 o_progress_bar",
+                                        a_o: [
+                                            
+                                            {
+                                                class: "o_progress_bar_fill",
+                                                ":style": 'f_style_progress_bar_fill()'
+                                            }, 
+                                            {
+                                                "v-if": "o_file && f_b_video_file(o_file.s_path_file)",
+                                                class: "posabs w100",
+                                                style: 'height: 10px',
+                                                a_o: [
+                                                    {
+                                                        class: "o_timestampsection_video posabs",
+                                                        "v-for": 'o_timestampsection_video of o_filemeta.a_o_timestampsection_video',
+                                                        ":style": `f_s_css_from_o_timestampsection_video(o_timestampsection_video)`, 
+                                                        "a_o": [
+                                                            {
+                                                                // a_o: [
+                                                                //     {
+                                                                //         "v-for": "n_id_tag of o_timestampsection_video.a_n_id_tag",
+                                                                //         ":style": '`background: ${a_o_tag.find(o=>{return o.n_id == n_id_tag}).s_color}`',
+                                                                //     }
+                                                                // ]
+                                                            }
+                                                        
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 ]
             }
@@ -451,14 +441,20 @@ const app = createApp({
     async mounted() {
             let o_self = this;
             globalThis.o_self = this;
+            o_self.o_video = null;
+            
 
 
             // Add window event listeners
             // window.addEventListener('pointerdown', this.f_pointerdown);
-            window.addEventListener('pointerup', this.f_pointerup);
+            document.addEventListener('pointerup', this.f_pointerup);
             // window.addEventListener('pointermove', this.f_pointermove);
-            window.addEventListener('keydown', this.f_keydown);
+            document.addEventListener('keydown', this.f_keydown);
 
+            // window keydown event is not triggered when video elemetn is in focus (after there was a seek event)
+            // so we have to 
+
+            
             await o_self.$nextTick(); 
 
             o_self.f_update_o_folderinfo('/');
@@ -471,7 +467,12 @@ const app = createApp({
             // for(let o_tag of o_self.o_meta.a_o_tag){
             //     o_tag.b_filter = false;
             // }
-
+            o_self.n_id_interval_playing = setInterval(function(){
+                if(o_self.o_video!=null){
+                    o_self.n_ms_video_monitor = o_self.o_video.currentTime * 1000;
+                }
+                // o_self.n_ms_video = o_self.o_video.currentTime * 1000;
+            }, 333);
 
 
     },
@@ -482,6 +483,93 @@ const app = createApp({
         window.removeEventListener('pointermove', this.f_pointermove);
     },
   methods: {
+    f_filter_timestampsection: function(){
+        let o_self = this;
+        o_self.b_filter_timestampsection = !o_self.b_filter_timestampsection;
+        o_self.f_update_a_o_file_filtered();
+
+    },
+    f_o_timestampsection_video_closest: function(){
+        let ndelta1 = 0;
+        let o_self = this;
+        let o_filemeta = o_self.o_filemeta;
+        if(o_filemeta.a_o_timestampsection_video.length > 0){
+            let o = o_filemeta.a_o_timestampsection_video.at(-1);
+            ndelta1 = Math.abs(o.n_ms_start - o_self.n_ms_video);
+            for(let o_timestampsection_video of o_filemeta.a_o_timestampsection_video){
+                let n1 = Math.abs(o_timestampsection_video.n_ms_start - o_self.n_ms_video);
+                let n2 = Math.abs(o_timestampsection_video.n_ms_end - o_self.n_ms_video);
+                if(n1 < ndelta1){
+                    ndelta1 = n1;
+                    o = o_timestampsection_video;
+                }
+                if(n2 < ndelta1){
+                    ndelta1 = n2;
+                    o = o_timestampsection_video;
+                }
+            }
+            return o;
+        }
+        return null
+    },
+    f_add_current_time_ms: function(n_ms){
+        let o_self =this;
+        o_self.n_ms_video = Math.min(o_self.o_video.duration*1000, Math.max(0,(o_self.n_ms_video + n_ms)));
+    },
+    f_export_video: async function(){
+        let o_self = this;
+        if(o_self.o_video != null){
+            let o_resp = await this.f_o_server_response(
+                '/exportvideo',
+                o_self.o_filemeta,
+                null
+            );
+            if(
+                o_resp?.o_server_error?.s.toLowerCase().includes('any specific error')
+            ){ 
+                // error specific things
+            }else{
+                console.log(o_resp)
+            }
+        }
+    },
+    f_style_progress_bar_fill: function(){
+        let o_self = this;
+        return {
+            width: `${(o_self.n_ms_video_monitor/(o_self.o_video.duration * 1000))*100}%`
+        }
+    },
+    f_s_readable_foreground_text_color: function(s_color_hex){
+        // if the color is a bright, we need a dark font , if it is dark we need a bright font
+        readableTextColor(s_color_hex);
+    },
+    f_toggle_play_pause: function(){
+        let o_self = this;
+        if(o_self.b_playing == true){
+            o_self.o_video.pause();
+            o_self.b_playing = false;
+        }else{
+            o_self.o_video.play();
+            o_self.b_playing = true;
+        }
+    },
+    f_s_css_from_o_timestampsection_video: function(o_timestampsection_video){
+        let o_self = this;
+        //'`background: ${o_timestampsection_video.o_tag.s_color};left: ${((o_timestampsection_video.n_ms/1000)/o_video.duration)*100}%`', 
+        let s_width = "10px";
+        if(o_timestampsection_video.n_ms_end > o_timestampsection_video.n_ms_start) {
+            s_width = `${((o_timestampsection_video.n_ms_end/1000)/o_self.o_video.duration)*100 - ((o_timestampsection_video.n_ms_start/1000)/o_self.o_video.duration)*100}%`;
+        }
+        let s =  [
+            // `backgro/und: ${o_timestampsection_video.o_tag.s_color}`,
+            `left: ${((o_timestampsection_video.n_ms_start/1000)/o_self.o_video.duration)*100}%`, 
+            `width: ${s_width}`, 
+            `height:100%`, 
+            `background: rgba(255,0,0,0.5)`,
+            `border: 1px solid rgba(255,255,0,0.5)`,
+        ].join(';')
+        return s
+    },
     f_b_img_file: function(s_path_file){
         return f_b_img_file(s_path_file);
     },
@@ -515,11 +603,11 @@ const app = createApp({
 
             o_meta = JSON.parse(o_resp?.o_meta?.s_text);
         }
-
+        o_self.o_meta = o_meta;
         o_self.a_o_file = o_self.o_folderinfo.a_o_entry_image.concat(o_self.o_folderinfo.a_o_entry_video);
         o_self.a_o_file_filtered = o_self.a_o_file;
         o_self.f_next_file();
-        o_self.a_o_toast = o_self.a_o_toast.filter(o=>o != o_toast);
+        o_self.a_o_toast = o_self.a_o_toast.filter(o=>o.s_message != o_toast.s_message);
 
     },
     f_update_o_folderinfo: async function(s_path_abs, b_recursive = false){
@@ -548,8 +636,16 @@ const app = createApp({
             )
         }, 1000)
     },
+    f_next_timestamp: function(){
+
+    },
+    f_prev_timestamp: function(){
+
+    },
     f_next_file: function(){
         let o_self = this;
+        globalThis.o_self = this;
+        
         let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) + 1) % o_self.a_o_file_filtered.length];
         o_self.o_file = o;
 
@@ -571,6 +667,12 @@ const app = createApp({
         if(o_settings && !o_settings.contains(o_event.target)){     
             o_self.b_show_settings = false;
         }
+        let n_x_nor = o_event.clientX/window.innerWidth;
+
+
+        if (o_event.target.closest('.o_progress_bar')) {
+            o_self.n_ms_video = n_x_nor * o_self.o_video.duration * 1000;
+        }
     },
     f_update_a_o_file_filtered: function(){
         let o_self = this;
@@ -578,8 +680,13 @@ const app = createApp({
         let a_o = o_self.a_o_file.filter(o_file=>{
             const b_matches_tag_filter = o_self.f_o_file_matches_tags(o_file, a_n_id_tag_filter);
             // console.log({b_has_image_ending, b_matches_tag_filter})
+            let b_timestampsection = true;
+            if(o_self.b_filter_timestampsection){
+                b_timestampsection = 
+                    o_file.o_filemeta.a_o_timestampsection_video?.length == 0 || o_file.o_filemeta.a_o_timestampsection_video == undefined;
+            }
 
-            return b_matches_tag_filter;
+            return b_matches_tag_filter && b_timestampsection;
         })
         
         // console.log(a_n_id_tag_filter)
@@ -618,9 +725,9 @@ const app = createApp({
         let o_data = await o_resp.json();
         if(o_data?.o_server_error?.s != ''){
 
-            console.error(o_data.o_server_error.s);
-            console.error(o_data.o_server_error.n);
-            
+            console.error(`fetchresperror: ${o_data.o_server_error.s}`);
+            console.error(`fetchresperror: ${o_data.o_server_error.n}`);
+
         }
 
         return o_data;
@@ -643,6 +750,8 @@ const app = createApp({
     },
     f_keydown: function(o_event){
         let o_self = this;
+        let o_filemeta = o_self.o_filemeta;
+
         // if right arrow key
         if(o_event.key === "ArrowRight"){
             o_self.f_next_file();
@@ -655,7 +764,7 @@ const app = createApp({
         }
         //escape key
         if(o_event.key === "Escape"){
-            o_self.b_show_shortcut_help = false;
+            o_self.s_shortcut_help = '';
             o_self.b_show_settings = false;
         }
         if(o_self.b_show_shortcut_help){
@@ -666,25 +775,107 @@ const app = createApp({
             if(o_event.shiftKey){s_key = 'shift+' + s_key;}
             if(o_event.altKey){s_key = 'alt+' + s_key;}
             o_tag.s_shortcut = s_key;
-            o_self.b_show_shortcut_help = false;
+            o_self.s_shortcut_help = '';
         }
-        if(!o_self.b_show_shortcut_help && !o_self.b_show_settings){
+        if(o_self.s_shortcut_help == '' && !o_self.b_show_settings){
             //check if key matches any tag shortcut
             let o_tag = o_self.o_meta.a_o_tag.find(o=>{
                 return o.s_shortcut.toLowerCase() == (o_event.ctrlKey ? 'ctrl+' : '') + (o_event.shiftKey ? 'shift+' : '') + (o_event.altKey ? 'alt+' : '') + o_event.key.toLowerCase();
             })
             if(o_tag){
                 //add tag
-                if(!o_self.o_filemeta.a_n_id_tag.includes(o_tag.n_id)){
-                    o_self.o_filemeta.a_n_id_tag.push(o_tag.n_id);
-                }else{
-                    o_self.o_filemeta.a_n_id_tag = o_self.o_filemeta.a_n_id_tag.filter(n_id=>{n_id != o_tag.n_id})
+                if(o_self.f_b_img_file(o_filemeta.s_path_file_abs)){
+                    if(!o_filemeta.a_n_id_tag.includes(o_tag.n_id)){
+                        o_filemeta.a_n_id_tag.push(o_tag.n_id);
+                    }else{
+                        o_filemeta.a_n_id_tag = o_filemeta.a_n_id_tag.filter(n_id=>{n_id != o_tag.n_id})
+                    }
                 }
+                // if video file, check if current time is inside of two timestamps, if so 
+                // add the tag to the timestamp
                 o_self.f_try_to_save();
-                
+
             }
             
         }
+        if(o_event.key == " "){
+            // Spacebar pressed
+            if(o_self.o_video && o_self.f_b_video_file(o_filemeta.s_path_file_abs)){
+                o_self.o_video.paused ? o_self.o_video.play() : o_self.o_video.pause();
+            }
+        }
+        if(o_event.key === "t"){
+            // keydown event not triggered when video is in focus
+         
+            // add timestamp
+            if(o_self.o_video && o_self.f_b_video_file(o_filemeta.s_path_file_abs)){
+                if(o_filemeta.a_o_timestampsection_video == undefined){
+                    o_filemeta.a_o_timestampsection_video = [];
+                }
+                let o_timestampsection_video_closest = o_self.f_o_timestampsection_video_closest();
+                
+                let b_updated = false;
+                if(o_timestampsection_video_closest != null){
+                    if(o_timestampsection_video_closest?.n_ms_start == null){
+                        o_timestampsection_video_closest.n_ms_start = o_self.o_video.currentTime * 1000;
+                        b_updated = true;
+                    }
+                    if(o_timestampsection_video_closest?.n_ms_end == null){
+                        o_timestampsection_video_closest.n_ms_end = o_self.o_video.currentTime * 1000;
+                        b_updated = true;
+                    }
+                }
+                if(
+                    !b_updated && 
+                    (
+                        o_timestampsection_video_closest == null||
+                        (o_timestampsection_video_closest?.n_ms_start != null && o_timestampsection_video_closest?.n_ms_end != null)
+                    )
+                ){
+                    o_timestampsection_video_closest = f_o_timestampsection_video(
+                            o_self.o_video.currentTime * 1000,
+                            null,
+                            []
+                        )
+                    o_filemeta.a_o_timestampsection_video.push(
+                        o_timestampsection_video_closest
+                    );
+                }
+                if(o_timestampsection_video_closest != null){
+                    if((o_timestampsection_video_closest?.n_ms_start != null && o_timestampsection_video_closest?.n_ms_end != null)){
+
+                        if(o_timestampsection_video_closest.n_ms_end < o_timestampsection_video_closest.n_ms_start){
+                            let n_tmp = o_timestampsection_video_closest.n_ms_start;
+                            o_timestampsection_video_closest.n_ms_start = o_timestampsection_video_closest.n_ms_end;
+                            o_timestampsection_video_closest.n_ms_end = n_tmp;
+                        }
+                    }
+                }
+            }
+            o_self.f_try_to_save();
+
+        }
+        if(o_event.key === "r"){
+            // keydown event not triggered when video is in focus
+         
+            // add timestamp
+            if(o_self.o_video && o_self.f_b_video_file(o_filemeta.s_path_file_abs)){
+                if(o_filemeta.a_o_timestampsection_video == undefined){
+                    o_filemeta.a_o_timestampsection_video = [];
+                }
+                let o_timestampsection_video_closest = o_self.f_o_timestampsection_video_closest();
+                let nd1 = Math.abs(o_self.n_ms_video - o_timestampsection_video_closest.n_ms_start);
+                let nd2 = Math.abs(o_self.n_ms_video - o_timestampsection_video_closest.n_ms_end);
+                if(nd1 < nd2){
+                    o_timestampsection_video_closest.n_ms_start = null;
+                }else{
+                    o_timestampsection_video_closest.n_ms_end = null;
+                }
+            }
+            o_self.f_try_to_save();
+
+        }
+
     },
 
     f_o_and_handle_server_response: async function(o_resp){
@@ -698,26 +889,28 @@ const app = createApp({
     },
 
     watch: {
-        
 
-
+        'n_ms_video': function(){
+            if(o_self?.o_video?.currentTime != undefined){
+                o_self.o_video.currentTime = o_self.n_ms_video / 1000;
+            }
+        },
         'a_o_file': function(newVal, oldVal) {
             let o_self = this;
+            
             console.log('a_o_file changed:', newVal);
             o_self.s_loadingstate_info = `Updating metadata for ${o_self.a_o_file.length} files...`
             for(let o of o_self.a_o_file){
-                if(o.o_filemeta == undefined){
-                    let o_filemeta = o_self.o_meta.a_o_filemeta.find(o2=>o2.s_path_file_abs == o?.s_path_file);
-                    if(!o_filemeta){
-                            o_filemeta = f_o_filemeta(
-                                o?.s_path_file,
-                                []
-                            );
-                    }
-                    o.o_filemeta = o_filemeta;
-                    o_self.o_meta.a_o_filemeta.push(o.o_filemeta);
-
+                let o_filemeta = o_self.o_meta.a_o_filemeta.find(o2=>o2.s_path_file_abs == o?.s_path_file);
+                if(!o_filemeta){
+                        o_filemeta = f_o_filemeta(
+                            o?.s_path_file,
+                            []
+                        );
                 }
+                o.o_filemeta = o_filemeta;
+                o_self.o_meta.a_o_filemeta.push(o.o_filemeta);
+
             }
             o_self.s_loadingstate_info = ''
             o_self.f_update_a_o_file_filtered();
@@ -728,7 +921,7 @@ const app = createApp({
 
             // add tag 
             o_self.o_filemeta = o_self.o_meta.a_o_filemeta.find(o=>o.s_path_file_abs == o_self.o_file?.s_path_file);
-
+            
 
             console.log('o_file changed:', newVal);
             let n_idx = o_self.a_o_file.indexOf(o_self.o_file);
@@ -739,7 +932,20 @@ const app = createApp({
                 let img = new Image();
                 img.src = o_self.f_s_path_from_o_file(o_file)
             }
-        }, 
+            o_self.b_playing = false;
+
+        },
+        
+        's_path_file_current': async function(){
+            let o_self = this;
+            await o_self.$nextTick();
+            o_self.o_video = document.querySelector('video');
+            await o_self.$nextTick();
+            await o_self.$forceUpdate();
+            this.b_playing = true; 
+            this.o_video.play();
+
+        } 
     },
   data() {
     return o_state
