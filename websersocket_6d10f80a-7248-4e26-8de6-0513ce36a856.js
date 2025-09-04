@@ -23,7 +23,8 @@ let a_o_ws_client = []
 import { 
     f_o_folderinfo,
     f_b_img_file,
-    f_b_video_file
+    f_b_video_file,
+    f_s_path_file_exported_video
  } from './localhost/functions.module.js';
 
 // const o_kv = await Deno.openKv();
@@ -165,6 +166,18 @@ let f_handler = async function(o_request){
         return o;
 
 
+    }
+    if(o_url.pathname == '/exportvideo'){
+        let o = f_o_response_try_and_catch_response(
+            async function(){
+                let o_data = await o_request.json();
+                let s_path_video_new = await f_s_path_file_exported_video(o_data);
+                return {
+                    s_path_video_new
+                }
+            }
+        )
+        return o;
     }
 
     if(o_url.pathname.startsWith('/filerequest')){
