@@ -145,9 +145,15 @@ let f_handler = async function(o_request){
             async function(){
                 let o_data = await o_request.json();
                 let o_folderinfo = f_o_folderinfo(o_data?.s_path_abs.trim());
-                let a_o = await f_a_o_entry__from_s_path(o_folderinfo.s_path_abs.trim());
+                o_folderinfo.b_recursive = o_data?.b_recursive === true;
+                console.log(o_folderinfo)
+                let a_o = await f_a_o_entry__from_s_path(o_folderinfo.s_path_abs.trim(), o_folderinfo.b_recursive);
+                // console.log(a_o);
 
-                console.log(a_o);
+                // let f_iterate_recursively = async function(a_o){
+
+                // }
+                // console.log(a_o);
                 o_folderinfo.n_items = a_o.length;
                 o_folderinfo.a_o_entry_image = a_o.filter(o=>{
                     return f_b_img_file(o.name);

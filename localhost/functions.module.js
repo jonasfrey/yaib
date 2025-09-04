@@ -30,7 +30,8 @@ let f_o_folderinfo = function(
     n_items, 
     a_o_entry_folder, 
     a_o_entry_image, 
-    a_o_entry_video
+    a_o_entry_video, 
+    b_recursive = false,
     
 ){
     return {
@@ -39,7 +40,8 @@ let f_o_folderinfo = function(
         n_items, 
         a_o_entry_folder,  
         a_o_entry_image,
-        a_o_entry_video
+        a_o_entry_video,
+        b_recursive
     }
 
 }

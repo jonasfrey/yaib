@@ -275,6 +275,11 @@ let o = await f_o_html_from_o_js(
                                 innerText: "Load files"
                             },
                             {
+                                'v-on:click': "b_select_folder_overlay = false;f_load_files_recursive();",
+                                s_tag: "button",
+                                innerText: "Load files recursively"
+                            },
+                            {
                                 class: 'flex_row',
                                 a_o: [
                                     {
@@ -483,10 +488,16 @@ const app = createApp({
     f_b_video_file: function(s_path_file){
         return f_b_video_file(s_path_file);
     },
+    f_load_files_recursive: async function(){
+        let o_self = this;
+        await this.f_update_o_folderinfo(o_self.o_folderinfo.s_path_abs, true);
+        await this.f_load_files();
+    },
     f_load_files: async function(){
         //check if json with metadata exists in folder
         
         let o_self = this;
+
         this.s_path_meta_json = `${o_self.o_folderinfo.s_path_abs}/.yaib_6d10f80a-7248-4e26-8de6-0513ce36a856_o_meta.json`;
         let o_toast = f_o_toast(`Loading files ...`, 'loading');
         o_self.a_o_toast.push(o_toast);
@@ -511,12 +522,13 @@ const app = createApp({
         o_self.a_o_toast = o_self.a_o_toast.filter(o=>o != o_toast);
 
     },
-    f_update_o_folderinfo: async function(s_path_abs){
+    f_update_o_folderinfo: async function(s_path_abs, b_recursive = false){
         let o_self = this;
         o_self.o_folderinfo_prev = o_self.o_folderinfo;
         o_self.o_folderinfo = f_o_folderinfo(
             s_path_abs,
         );
+        o_self.o_folderinfo.b_recursive = b_recursive;
         let o = await o_self.f_o_server_response(
             '/folderinfo',
             o_self.o_folderinfo
