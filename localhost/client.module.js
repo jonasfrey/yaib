@@ -98,6 +98,7 @@ let o_state = reactive({
     a_o_file: [],
     a_o_file_filtered: [],
     o_file: null,
+    n_idx_file: 0, 
     o_timestampsection_video: null,
     o_filemeta: null,
     o_meta: f_o_meta(),
@@ -241,7 +242,7 @@ let o = await f_o_html_from_o_js(
                         a_o: [
                             {
                                 s_tag: "span", 
-                                innerText: '{{o_file?.name}}',
+                                innerText: '{{o_file?.name}} | {{n_idx_file+1}}/{{a_o_file_filtered?.length}}',
                             }
                         ]
                     },
@@ -932,6 +933,8 @@ const app = createApp({
                 let img = new Image();
                 img.src = o_self.f_s_path_from_o_file(o_file)
             }
+            o_self.n_idx_file = o_self.a_o_file_filtered.indexOf(o_self.o_file);
+
             o_self.b_playing = false;
 
         },

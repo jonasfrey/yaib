@@ -27,6 +27,14 @@ div{
     width: 100vw;
     height: 100vh;
 }
+a{
+    color: rgba(100,149,237,0.8); /* cornflowerblue */
+    text-decoration: none;
+}
+a:hover{
+    text-decoration: underline;
+    color: rgba(100,149,237,1); /* cornflowerblue */
+}
 
 input,button{
     /* matching the dark theme */
@@ -65,7 +73,26 @@ button:hover, input:hover{
 
 
 .folder_list{
-    max-height: 50vh;
+    max-height: 100%;
+    overflow: scroll;
+}
+/*scrollbar styling; a very thin and subtle scrollbar*/
+.folder_list::-webkit-scrollbar {
+    width: 0.5rem;
+}
+.folder_list::-webkit-scrollbar-thumb {
+    background: rgba(100,100,100,0.5);
+    border-radius: 0.25rem;
+}
+.folder_list::-webkit-scrollbar-thumb:hover {
+    background: rgba(100,100,100,0.8);
+}
+.folder_list::-webkit-scrollbar-track {
+    background: rgba(50,50,50,0.5);
+    border-radius: 0.25rem;
+}
+.folder_list::-webkit-scrollbar-track:hover {
+    background: rgba(50,50,50,0.8);
 }
 
 .overlay{
@@ -87,6 +114,7 @@ button:hover, input:hover{
     height: 100vh;
 }
 
+.file_container,
 .file_container img,
 .file_container video{
     width: 100%;
