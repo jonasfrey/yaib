@@ -14,6 +14,7 @@ body{
     max-width:100vw;
     max-height: 100vh;
     font-size: 12px;
+    font-family: Helvetica, sans-serif;
 }
 div{
     box-sizing: border-box;
@@ -28,12 +29,13 @@ div{
     height: 100vh;
 }
 a{
-    color: rgba(100,149,237,0.8); /* cornflowerblue */
+    /* // a light blue  */
+    color: #ADD8E6;
     text-decoration: none;
 }
 a:hover{
     text-decoration: underline;
-    color: rgba(100,149,237,1); /* cornflowerblue */
+    color: #ADD8E65EE; /* cornflowerblue */
 }
 
 input,button{
@@ -156,4 +158,12 @@ button:hover, input:hover{
 }
 #inputs{
     z-index: 2;
+}
+.path_navigation .ds, 
+.path_navigation a{
+    padding: 0.2rem;
+}
+.path_navigation a{
+    border: 0.02rem solid #ADD8E6;
+    border-radius: 0.2rem;
 }

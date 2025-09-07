@@ -169,10 +169,14 @@ let f_s_path_file_exported_video = async function(
     await Deno.remove(s_path_file_list);
     return s_path_file_combined_new
 }
+let f_a_s_part_from_s_path = function(s_path){
+    return s_path.replace(/\\/g, "/").split("/").filter(Boolean);
+}
 export {
     f_o_folderinfo,
     f_o_toast,
     f_b_img_file,
     f_b_video_file,
-    f_s_path_file_exported_video
+    f_s_path_file_exported_video, 
+    f_a_s_part_from_s_path
 }

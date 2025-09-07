@@ -13,8 +13,9 @@ import {
 
 import { createApp, ref, onUpdated, reactive} from 'https://unpkg.com/vue@3/dist/vue.esm-browser.js'
 
-
+let s_fs = '/';
 import {
+    f_a_s_part_from_s_path,
     f_b_img_file,
     f_b_video_file
 } from "./functions.module.js"
@@ -24,12 +25,23 @@ f_add_css(
     s_css
 );
 
-import { 
+import {
     f_o_folderinfo,
     f_o_toast
  } from "./functions.module.js";
 import { readableTextColor } from "./color.js";
 
+let f_o_persistantdata = function(
+    a_s_path_filteredhistory,
+    a_o_filemeta, 
+    a_o_tag,
+){
+    return  {
+        a_s_path_filteredhistory,
+        a_o_filemeta, 
+        a_o_tag,
+    }
+}
 let f_o_timestampsection_video = function(
     n_ms_start, 
     n_ms_end,
@@ -85,14 +97,19 @@ let a_o_tag_default = [
         f_o_tag(2, 1, 'red', 's', '#ff0000'),
         f_o_tag(3, 2, 'water', 'd', '#0000ff')
     ]
+
+let o_persistantdata_default = f_o_persistantdata(
+    [], 
+    [], 
+    a_o_tag_default
+);
 let f_o_meta = function(){
     return {
-        a_o_filemeta: [], 
-        a_o_tag: a_o_tag_default, 
-        a_o_timestampsection_video: []
+
     }
 }
 let o_state = reactive({
+    o_persistantdata: o_persistantdata_default,
     b_filter_timestampsection: false,
     o_tag: null,
     a_o_file: [],
@@ -101,14 +118,13 @@ let o_state = reactive({
     n_idx_file: 0, 
     o_timestampsection_video: null,
     o_filemeta: null,
-    o_meta: f_o_meta(),
     b_show_settings: false,
     s_shortcut_help: '',
     s_shortcut_timestamp: 't', 
     s_path_file_current: '',
     o_folderinfo: null,
     o_folderinfo_prev: null,
-    s_path_meta_json: '',
+    s_path_meta_json : `.gitignored.yaib.o_persistantdata.6d10f80a-7248-4e26-8de6-0513ce36a856.1.json`,
     s_loadingstate_info: '',    
     b_select_folder_overlay: false,
     n_id_timeout_saving: null,
@@ -170,7 +186,7 @@ let o = await f_o_html_from_o_js(
                         ]
                     },
                     {
-                        class: "overlay",
+                        class: "overlay select_folder",
                         'v-if': "b_select_folder_overlay",
                         a_o: [
                             {
@@ -184,16 +200,31 @@ let o = await f_o_html_from_o_js(
                                 innerText: "Load files recursively"
                             },
                             {
-                                class: 'flex_row',
+                                class: 'flex_row path_navigation',
                                 a_o: [
-                                    {
-                                        s_tag: "button", 
-                                        innerText: "⬅️",
-                                        'v-on:click': 'f_update_o_folderinfo(o_folderinfo_prev.s_path_abs);',
-                                    },
+                                    // {
+                                    //     s_tag: "button", 
+                                    //     innerText: "⬅️",
+                                    //     'v-on:click': 'f_update_o_folderinfo(o_folderinfo_prev.s_path_abs);',
+                                    // },
                                     {
                                         s_tag: "span",
-                                        innerText: "{{o_folderinfo?.s_path_abs}}"
+                                        "v-for": "(s_part, n_idx) in a_s_part_from_s_path",
+                                        class: "flex_row",
+                                        a_o: [
+                                            {
+                                                s_tag: "a",
+                                                "v-on:click": "f_update_o_folderinfo_uptopart(n_idx)",
+                                                // innerText: "{{o_folderinfo?.s_path_abs}}"
+                                                innerText: "{{s_part}}"
+                                            },
+                                            {
+                                                class: "ds",
+                                                "v-if": "n_idx > 0",
+                                                innerText: "/"
+                                            }
+
+                                        ]
                                     }
                                 ]
                             },
@@ -209,7 +240,7 @@ let o = await f_o_html_from_o_js(
                                         'v-for': 'o_folder of o_folderinfo?.a_o_entry_folder',
                                         s_tag: "a",
                                         href: "#",
-                                        innerText: "{{o_folder.name}}",
+                                        innerText: "📂{{o_folder.name}}",
                                         'v-on:click': 'f_update_o_folderinfo(o_folder.s_path_file);'
                                     }
                                 ]
@@ -248,7 +279,7 @@ let o = await f_o_html_from_o_js(
                     },
                     {
                         class: "tag flex_row", 
-                        'v-for': 'o_tag2 in o_meta.a_o_tag',
+                        'v-for': 'o_tag2 in o_persistantdata.a_o_tag',
                         a_o: [
                             {
                                 s_tag: "span", 
@@ -461,20 +492,32 @@ const app = createApp({
             o_self.f_update_o_folderinfo('/');
             // console.log(o_folderinfo__populated);
 
-            // o_self.o_meta = await o_self.f_o_meta_data();
-            // if(o_self.o_meta?.a_o_tag == undefined){
-            //     o_self.o_meta.a_o_tag = a_o_tag_default;
-            // }
-            // for(let o_tag of o_self.o_meta.a_o_tag){
-            //     o_tag.b_filter = false;
-            // }
+            let o_resp = await this.f_o_server_response(
+                '/readtextfile',
+                {
+                    s_path_abs: o_self.s_path_meta_json
+                },
+                null
+            );
+            if(
+                o_resp?.o_server_error?.s != ''
+            ){ 
+                // error specific things
+            }else{
+                o_self.o_persistantdata = JSON.parse(o_resp.o_meta.s_text);
+            }
+            let v_path_last =  o_self.o_persistantdata.a_s_path_filteredhistory?.at(-1);
+            if(v_path_last){
+
+                o_self.f_update_o_folderinfo(v_path_last);
+            }
+            
             o_self.n_id_interval_playing = setInterval(function(){
                 if(o_self.o_video!=null){
                     o_self.n_ms_video_monitor = o_self.o_video.currentTime * 1000;
                 }
                 // o_self.n_ms_video = o_self.o_video.currentTime * 1000;
             }, 333);
-
 
     },
     beforeUnmount() {
@@ -484,6 +527,7 @@ const app = createApp({
         window.removeEventListener('pointermove', this.f_pointermove);
     },
   methods: {
+    f_a_s_part_from_s_path: f_a_s_part_from_s_path,
     f_filter_timestampsection: function(){
         let o_self = this;
         o_self.b_filter_timestampsection = !o_self.b_filter_timestampsection;
@@ -587,28 +631,24 @@ const app = createApp({
         
         let o_self = this;
 
-        this.s_path_meta_json = `${o_self.o_folderinfo.s_path_abs}/.yaib_6d10f80a-7248-4e26-8de6-0513ce36a856_o_meta.json`;
-        let o_toast = f_o_toast(`Loading files ...`, 'loading');
-        o_self.a_o_toast.push(o_toast);
         await o_self.$nextTick();
-        let o_meta = null;
-        let o_resp = await this.f_o_server_response('/readtextfile',
-            {
-                s_path_abs: this.s_path_meta_json,
-            }, 
-            null
-        )
-        if(o_resp?.o_server_error?.s.toLowerCase().includes('no such file or directory')){ //todo: check OS specific error message
-            o_meta = f_o_meta();
-        }else{
 
-            o_meta = JSON.parse(o_resp?.o_meta?.s_text);
-        }
-        o_self.o_meta = o_meta;
         o_self.a_o_file = o_self.o_folderinfo.a_o_entry_image.concat(o_self.o_folderinfo.a_o_entry_video);
         o_self.a_o_file_filtered = o_self.a_o_file;
         o_self.f_next_file();
-        o_self.a_o_toast = o_self.a_o_toast.filter(o=>o.s_message != o_toast.s_message);
+        o_self.o_persistantdata.a_s_path_filteredhistory.push(
+            o_self.o_folderinfo.s_path_abs
+        )
+        o_self.f_try_to_save();
+
+    },
+    f_update_o_folderinfo_uptopart: async function(n_idx){
+        
+        let o_self = this;
+
+        let s_path_abs = o_self.a_s_part_from_s_path.slice(0,n_idx+1).join(s_fs);
+        
+        return o_self.f_update_o_folderinfo(s_path_abs);
 
     },
     f_update_o_folderinfo: async function(s_path_abs, b_recursive = false){
@@ -632,7 +672,7 @@ const app = createApp({
             o_self.f_o_server_response('/writetextfile',
                 {
                     s_path_abs: o_self.s_path_meta_json,
-                    s_text: JSON.stringify(o_self.o_meta)
+                    s_text: JSON.stringify(o_self.o_persistantdata, null, 4)
                 }
             )
         }, 1000)
@@ -645,7 +685,6 @@ const app = createApp({
     },
     f_next_file: function(){
         let o_self = this;
-        globalThis.o_self = this;
         
         let o = o_self.a_o_file_filtered[(o_self.a_o_file_filtered.indexOf(o_self.o_file) + 1) % o_self.a_o_file_filtered.length];
         o_self.o_file = o;
@@ -677,7 +716,7 @@ const app = createApp({
     },
     f_update_a_o_file_filtered: function(){
         let o_self = this;
-        let a_n_id_tag_filter = o_self.o_meta.a_o_tag.filter(o=>o.b_filter).map(o=>o.n_id);
+        let a_n_id_tag_filter = o_self.o_persistantdata.a_o_tag.filter(o=>o.b_filter).map(o=>o.n_id);
         let a_o = o_self.a_o_file.filter(o_file=>{
             const b_matches_tag_filter = o_self.f_o_file_matches_tags(o_file, a_n_id_tag_filter);
             // console.log({b_has_image_ending, b_matches_tag_filter})
@@ -737,17 +776,17 @@ const app = createApp({
 
     f_add_tag: function(){
         let o_self = this;
-        let n_id_tag_hightest = o_self.o_meta.a_o_tag.reduce((n_acc, o_tag)=>{
+        let n_id_tag_hightest = o_self.o_persistantdata.a_o_tag.reduce((n_acc, o_tag)=>{
             return Math.max(n_acc, o_tag.n_id);
         }, 0);
         let o_tag = f_o_tag(
             n_id_tag_hightest+1, 
-            o_self.o_meta.a_o_tag.length, 
+            o_self.o_persistantdata.a_o_tag.length, 
             'new tag',
             '',
             '#ff0000'
         )
-        o_self.o_meta.a_o_tag.push(o_tag);
+        o_self.o_persistantdata.a_o_tag.push(o_tag);
     },
     f_keydown: function(o_event){
         let o_self = this;
@@ -780,7 +819,7 @@ const app = createApp({
         }
         if(o_self.s_shortcut_help == '' && !o_self.b_show_settings){
             //check if key matches any tag shortcut
-            let o_tag = o_self.o_meta.a_o_tag.find(o=>{
+            let o_tag = o_self.o_persistantdata.a_o_tag.find(o=>{
                 return o.s_shortcut.toLowerCase() == (o_event.ctrlKey ? 'ctrl+' : '') + (o_event.shiftKey ? 'shift+' : '') + (o_event.altKey ? 'alt+' : '') + o_event.key.toLowerCase();
             })
             if(o_tag){
@@ -888,7 +927,15 @@ const app = createApp({
     },
 
     },
-
+    computed: {
+        'a_s_part_from_s_path': function(){
+            let o_self = this;
+            return [
+                '/',
+                ...f_a_s_part_from_s_path(o_self.o_folderinfo?.s_path_abs)
+            ]
+        }
+    },
     watch: {
 
         'n_ms_video': function(){
@@ -902,7 +949,7 @@ const app = createApp({
             console.log('a_o_file changed:', newVal);
             o_self.s_loadingstate_info = `Updating metadata for ${o_self.a_o_file.length} files...`
             for(let o of o_self.a_o_file){
-                let o_filemeta = o_self.o_meta.a_o_filemeta.find(o2=>o2.s_path_file_abs == o?.s_path_file);
+                let o_filemeta = o_self.o_persistantdata.a_o_filemeta.find(o2=>o2.s_path_file_abs == o?.s_path_file);
                 if(!o_filemeta){
                         o_filemeta = f_o_filemeta(
                             o?.s_path_file,
@@ -910,7 +957,7 @@ const app = createApp({
                         );
                 }
                 o.o_filemeta = o_filemeta;
-                o_self.o_meta.a_o_filemeta.push(o.o_filemeta);
+                o_self.o_persistantdata.a_o_filemeta.push(o.o_filemeta);
 
             }
             o_self.s_loadingstate_info = ''
@@ -921,7 +968,7 @@ const app = createApp({
             o_self.s_path_file_current = o_self.f_s_path_from_o_file(o_self.o_file);
 
             // add tag 
-            o_self.o_filemeta = o_self.o_meta.a_o_filemeta.find(o=>o.s_path_file_abs == o_self.o_file?.s_path_file);
+            o_self.o_filemeta = o_self.o_persistantdata.a_o_filemeta.find(o=>o.s_path_file_abs == o_self.o_file?.s_path_file);
             
 
             console.log('o_file changed:', newVal);
@@ -941,12 +988,15 @@ const app = createApp({
         
         's_path_file_current': async function(){
             let o_self = this;
-            await o_self.$nextTick();
             o_self.o_video = document.querySelector('video');
-            await o_self.$nextTick();
-            await o_self.$forceUpdate();
-            this.b_playing = true; 
-            this.o_video.play();
+            if(o_self.o_video){
+
+                await o_self.$nextTick();
+                await o_self.$nextTick();
+                await o_self.$forceUpdate();
+                this.b_playing = true; 
+                this.o_video.play();
+            }
 
         } 
     },
@@ -968,6 +1018,5 @@ const app = createApp({
 
 app.mount('#app')
 
-globalThis.o_self = app
 
 

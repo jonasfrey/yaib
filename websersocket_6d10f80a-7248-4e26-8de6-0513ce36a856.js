@@ -9,7 +9,10 @@ import {
 } from "./classes.module.js"
 import { ensureDir } from "https://deno.land/std@0.224.0/fs/ensure_dir.ts";
 
-import { f_o_config } from "./functions.module.js";
+import { 
+    f_v_objectfromjsonensured,
+    f_save_jsonstrinigfied
+} from "./functions.module.js";
 import {
     f_a_o_entry__from_s_path
 } from "https://deno.land/x/handyhelpers@5.0.0/mod.js"
@@ -17,6 +20,8 @@ import {
 let s_path_abs_file_current = new URL(import.meta.url).pathname;
 let s_path_abs_folder_current = s_path_abs_file_current.split('/').slice(0, -1).join('/');
 const b_deno_deploy = Deno.env.get("DENO_DEPLOYMENT_ID") !== undefined;
+
+
 
 let a_o_ws_client = []
 
