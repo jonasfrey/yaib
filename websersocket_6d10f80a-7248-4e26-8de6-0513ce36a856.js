@@ -15,7 +15,7 @@ import {
 } from "./functions.module.js";
 import {
     f_a_o_entry__from_s_path
-} from "https://deno.land/x/handyhelpers@5.0.0/mod.js"
+} from "https://deno.land/x/handyhelpers@5.4.3/mod.js"
 
 let s_path_abs_file_current = new URL(import.meta.url).pathname;
 let s_path_abs_folder_current = s_path_abs_file_current.split('/').slice(0, -1).join('/');
@@ -29,7 +29,8 @@ import {
     f_o_folderinfo,
     f_b_img_file,
     f_b_video_file,
-    f_s_path_file_exported_video
+    f_s_path_file_exported_video,
+    f_s_path_gif_from_video
  } from './localhost/functions.module.js';
 
 // const o_kv = await Deno.openKv();
@@ -146,20 +147,21 @@ let f_handler = async function(o_request){
         );  
     }
     if(o_url.pathname == '/folderinfo'){
-        
-        let o = f_o_response_try_and_catch_response(
+        let o = {};
+
+    
+        o = await f_o_response_try_and_catch_response(
             async function(){
                 let o_data = await o_request.json();
                 let o_folderinfo = f_o_folderinfo(o_data?.s_path_abs.trim());
                 o_folderinfo.b_recursive = o_data?.b_recursive === true;
                 console.log(o_folderinfo)
-                let a_o = await f_a_o_entry__from_s_path(o_folderinfo.s_path_abs.trim(), o_folderinfo.b_recursive);
-                // console.log(a_o);
+                let a_o = []
+                
+                a_o = await f_a_o_entry__from_s_path(o_folderinfo.s_path_abs.trim(), o_folderinfo.b_recursive);
 
-                // let f_iterate_recursively = async function(a_o){
 
-                // }
-                // console.log(a_o);
+
                 o_folderinfo.n_items = a_o.length;
                 o_folderinfo.a_o_entry_image = a_o.filter(o=>{
                     return f_b_img_file(o.name);
@@ -174,6 +176,8 @@ let f_handler = async function(o_request){
 
             }
         )
+            
+
         return o;
 
 
@@ -183,8 +187,10 @@ let f_handler = async function(o_request){
             async function(){
                 let o_data = await o_request.json();
                 let s_path_video_new = await f_s_path_file_exported_video(o_data);
+                let s_path_file_gif = await f_s_path_gif_from_video(s_path_video_new);
                 return {
-                    s_path_video_new
+                    s_path_video_new,
+                    s_path_file_gif
                 }
             }
         )

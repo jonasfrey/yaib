@@ -506,10 +506,17 @@ const app = createApp({
             }else{
                 o_self.o_persistantdata = JSON.parse(o_resp.o_meta.s_text);
             }
-            let v_path_last =  o_self.o_persistantdata.a_s_path_filteredhistory?.at(-1);
-            if(v_path_last){
+            for(let s of o_self.o_persistantdata.a_s_path_filteredhistory){
+                if(s == null){continue;}
+            }
 
-                o_self.f_update_o_folderinfo(v_path_last);
+            
+            for(let s_path of o_self.o_persistantdata.a_s_path_filteredhistory){
+                // find the last visited and available folder
+                let b_nosuchfolder_or_no_permission = await o_self.f_update_o_folderinfo(s_path);
+                if(!b_nosuchfolder_or_no_permission){
+                    break;
+                }
             }
             
             o_self.n_id_interval_playing = setInterval(function(){
@@ -662,6 +669,10 @@ const app = createApp({
             '/folderinfo',
             o_self.o_folderinfo
         );
+        if(o?.o_server_error.s != ''){
+            //cannot find folder or no permission...
+            return false;
+        }
         let o_folderinfo__populated =  o?.o_meta;
         o_self.o_folderinfo = o_folderinfo__populated;
     },

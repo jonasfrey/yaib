@@ -169,6 +169,22 @@ let f_s_path_file_exported_video = async function(
     await Deno.remove(s_path_file_list);
     return s_path_file_combined_new
 }
+let f_s_path_gif_from_video = async function(s_path_file_video){
+    // use ffmpeg to convert a video to a gif
+    let s_name_file = s_path_file_video.split('/').pop();
+    let s_name_file_no_extension = s_name_file.split('.').slice(0, -1).join('.');
+    let s_path_folder_file = s_path_file_video.split('/').slice(0, -1).join('/');
+    let s_path_file_gif = `${s_path_folder_file}/${s_name_file_no_extension}.gif`;
+    const args = [
+        "ffmpeg","-y",
+        "-i", s_path_file_video,
+        "-vf", "fps=10,scale=1080:-1:flags=lanczos",
+        "-loop", "0",
+        s_path_file_gif
+    ];
+    await f_run_command(args);
+    return s_path_file_gif
+}
 let f_a_s_part_from_s_path = function(s_path){
     return s_path.replace(/\\/g, "/").split("/").filter(Boolean);
 }
@@ -178,5 +194,6 @@ export {
     f_b_img_file,
     f_b_video_file,
     f_s_path_file_exported_video, 
+    f_s_path_gif_from_video,
     f_a_s_part_from_s_path
 }
