@@ -29,9 +29,13 @@ import {
     f_o_folderinfo,
     f_b_img_file,
     f_b_video_file,
+
+ } from './localhost/functions.module.js';
+ 
+ import {
     f_s_path_file_exported_video,
     f_s_path_gif_from_video
- } from './localhost/functions.module.js';
+ } from './functions.module.js';
 
 // const o_kv = await Deno.openKv();
 // let o_config = await f_o_config();

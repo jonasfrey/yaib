@@ -42,15 +42,24 @@ let f_o_persistantdata = function(
         a_o_tag,
     }
 }
+let f_o_timestamp = function(
+    n_ms, 
+    a_n_id_tag, 
+    b_closest = false,
+){
+    return {
+        n_ms,
+        a_n_id_tag,
+        b_closest
+    }
+}
 let f_o_timestampsection_video = function(
     n_ms_start, 
     n_ms_end,
-    a_n_id_tag
 ){
     return {
         n_ms_start, 
-        n_ms_end,
-        a_n_id_tag
+        n_ms_end
     }
 }
 let f_o_tag = function(
@@ -132,7 +141,8 @@ let o_state = reactive({
     b_playing: false,
     n_id_interval_playing: null,
     n_ms_video: 0,
-    n_ms_video_monitor: 0,
+    n_ms_video_readvalue: 0,
+    o_timestamp_closest: null,
 }) 
 
 globalThis.o_state = o_state
@@ -152,7 +162,7 @@ let o = await f_o_html_from_o_js(
         // "v-on:pointerdown": "f_pointerdown",
         // "v-on:pointerup": "f_pointerup",
         // "v-on:pointermove": "f_pointermove",
-        "v-on:keydown": "f_keydown",
+        "v-on:keyup": "f_keyup",
         a_o: [
             {
                 id: "toast_container",
@@ -421,11 +431,11 @@ let o = await f_o_html_from_o_js(
                                             {
                                                 "v-if": "o_file && f_b_video_file(o_file.s_path_file)",
                                                 class: "posabs w100",
-                                                style: 'height: 10px',
+                                                style: 'height: 50%',
                                                 a_o: [
                                                     {
                                                         class: "o_timestampsection_video posabs",
-                                                        "v-for": 'o_timestampsection_video of o_filemeta.a_o_timestampsection_video',
+                                                        "v-for": 'o_timestampsection_video of a_o_timestampsection_video',
                                                         ":style": `f_s_css_from_o_timestampsection_video(o_timestampsection_video)`, 
                                                         "a_o": [
                                                             {
@@ -438,6 +448,11 @@ let o = await f_o_html_from_o_js(
                                                             }
                                                         
                                                         ]
+                                                    },
+                                                    {
+                                                        class: "o_timestampsection_video posabs",
+                                                        "v-for": 'o_timestamp of o_filemeta.a_o_timestamp',
+                                                        ":style": `f_s_css_from_o_timestamp(o_timestamp)`, 
                                                     }
                                                 ]
                                             },
@@ -481,10 +496,9 @@ const app = createApp({
             // window.addEventListener('pointerdown', this.f_pointerdown);
             document.addEventListener('pointerup', this.f_pointerup);
             // window.addEventListener('pointermove', this.f_pointermove);
-            document.addEventListener('keydown', this.f_keydown);
+            document.addEventListener('keyup', this.f_keyup);
 
             // window keydown event is not triggered when video elemetn is in focus (after there was a seek event)
-            // so we have to 
 
             
             await o_self.$nextTick(); 
@@ -521,10 +535,14 @@ const app = createApp({
             
             o_self.n_id_interval_playing = setInterval(function(){
                 if(o_self.o_video!=null){
-                    o_self.n_ms_video_monitor = o_self.o_video.currentTime * 1000;
+                    o_self.n_ms_video_readvalue = o_self.o_video.currentTime * 1000;
+                }
+                o_self.o_timestamp_closest = o_self.f_o_timestamp_closest();
+                if(o_self.o_timestamp_closest){
+                    o_self.o_timestamp_closest.b_closest = true;
                 }
                 // o_self.n_ms_video = o_self.o_video.currentTime * 1000;
-            }, 333);
+            }, 111);
 
     },
     beforeUnmount() {
@@ -541,28 +559,18 @@ const app = createApp({
         o_self.f_update_a_o_file_filtered();
 
     },
-    f_o_timestampsection_video_closest: function(){
+    f_o_timestamp_closest: function(){
         let ndelta1 = 0;
         let o_self = this;
         let o_filemeta = o_self.o_filemeta;
-        if(o_filemeta.a_o_timestampsection_video.length > 0){
-            let o = o_filemeta.a_o_timestampsection_video.at(-1);
-            ndelta1 = Math.abs(o.n_ms_start - o_self.n_ms_video);
-            for(let o_timestampsection_video of o_filemeta.a_o_timestampsection_video){
-                let n1 = Math.abs(o_timestampsection_video.n_ms_start - o_self.n_ms_video);
-                let n2 = Math.abs(o_timestampsection_video.n_ms_end - o_self.n_ms_video);
-                if(n1 < ndelta1){
-                    ndelta1 = n1;
-                    o = o_timestampsection_video;
-                }
-                if(n2 < ndelta1){
-                    ndelta1 = n2;
-                    o = o_timestampsection_video;
-                }
-            }
-            return o;
+        if(o_filemeta?.a_o_timestamp == undefined || o_filemeta?.a_o_timestamp.length == 0 || o_filemeta?.a_o_timestamp == null){
+            return null;
         }
-        return null
+        let o_timestamp_closest = o_filemeta.a_o_timestamp.sort((o1,o2)=>{
+            o1.b_closest = false;
+            return Math.abs(o1.n_ms - o_self.n_ms_video) - Math.abs(o2.n_ms - o_self.n_ms_video_readvalue);
+        })?.at(0);
+        return o_timestamp_closest;
     },
     f_add_current_time_ms: function(n_ms){
         let o_self =this;
@@ -588,7 +596,7 @@ const app = createApp({
     f_style_progress_bar_fill: function(){
         let o_self = this;
         return {
-            width: `${(o_self.n_ms_video_monitor/(o_self.o_video.duration * 1000))*100}%`
+            width: `${(o_self.n_ms_video_readvalue/(o_self.o_video.duration * 1000))*100}%`
         }
     },
     f_s_readable_foreground_text_color: function(s_color_hex){
@@ -605,6 +613,25 @@ const app = createApp({
             o_self.b_playing = true;
         }
     },
+    f_s_css_from_o_timestamp: function(o_timestamp){
+        let o_self = this;
+        //'`background: ${o_timestamp.o_tag.s_color};left: ${((o_timestamp.n_ms/1000)/o_video.duration)*100}%`', 
+        let s_width = "2px";
+
+        let n_opacity = 0.2;
+        if(o_timestamp.b_closest){
+            n_opacity = 1.0;
+        }
+        let s =  [
+            // `backgro/und: ${o_timestamp.o_tag.s_color}`,
+            `left: ${((o_timestamp.n_ms/1000)/o_self.o_video.duration)*100}%`, 
+            `width: ${s_width}`, 
+            `height:100%`, 
+            `background: rgba(6, 224, 24, ${n_opacity})`,
+            `border: 1px solid rgba(17, 0, 255, ${n_opacity})`,
+        ].join(';')
+        return s
+    },
     f_s_css_from_o_timestampsection_video: function(o_timestampsection_video){
         let o_self = this;
         //'`background: ${o_timestampsection_video.o_tag.s_color};left: ${((o_timestampsection_video.n_ms/1000)/o_video.duration)*100}%`', 
@@ -620,6 +647,7 @@ const app = createApp({
             `background: rgba(255,0,0,0.5)`,
             `border: 1px solid rgba(255,255,0,0.5)`,
         ].join(';')
+
         return s
     },
     f_b_img_file: function(s_path_file){
@@ -686,6 +714,7 @@ const app = createApp({
                     s_text: JSON.stringify(o_self.o_persistantdata, null, 4)
                 }
             )
+            
         }, 1000)
     },
     f_next_timestamp: function(){
@@ -799,7 +828,7 @@ const app = createApp({
         )
         o_self.o_persistantdata.a_o_tag.push(o_tag);
     },
-    f_keydown: function(o_event){
+    f_keyup: function(o_event){
         let o_self = this;
         let o_filemeta = o_self.o_filemeta;
 
@@ -811,7 +840,6 @@ const app = createApp({
         //if left arrow key
         if(o_event.key === "ArrowLeft"){
             o_self.f_prev_file();
-
         }
         //escape key
         if(o_event.key === "Escape"){
@@ -860,48 +888,15 @@ const app = createApp({
          
             // add timestamp
             if(o_self.o_video && o_self.f_b_video_file(o_filemeta.s_path_file_abs)){
-                if(o_filemeta.a_o_timestampsection_video == undefined){
-                    o_filemeta.a_o_timestampsection_video = [];
+                if(o_filemeta.a_o_timestamp == undefined){
+                    o_filemeta.a_o_timestamp = [];
                 }
-                let o_timestampsection_video_closest = o_self.f_o_timestampsection_video_closest();
-                
-                let b_updated = false;
-                if(o_timestampsection_video_closest != null){
-                    if(o_timestampsection_video_closest?.n_ms_start == null){
-                        o_timestampsection_video_closest.n_ms_start = o_self.o_video.currentTime * 1000;
-                        b_updated = true;
-                    }
-                    if(o_timestampsection_video_closest?.n_ms_end == null){
-                        o_timestampsection_video_closest.n_ms_end = o_self.o_video.currentTime * 1000;
-                        b_updated = true;
-                    }
-                }
-                if(
-                    !b_updated && 
-                    (
-                        o_timestampsection_video_closest == null||
-                        (o_timestampsection_video_closest?.n_ms_start != null && o_timestampsection_video_closest?.n_ms_end != null)
+                o_filemeta.a_o_timestamp.push(
+                    f_o_timestamp(
+                        o_self.n_ms_video_readvalue,
+                        []
                     )
-                ){
-                    o_timestampsection_video_closest = f_o_timestampsection_video(
-                            o_self.o_video.currentTime * 1000,
-                            null,
-                            []
-                        )
-                    o_filemeta.a_o_timestampsection_video.push(
-                        o_timestampsection_video_closest
-                    );
-                }
-                if(o_timestampsection_video_closest != null){
-                    if((o_timestampsection_video_closest?.n_ms_start != null && o_timestampsection_video_closest?.n_ms_end != null)){
-
-                        if(o_timestampsection_video_closest.n_ms_end < o_timestampsection_video_closest.n_ms_start){
-                            let n_tmp = o_timestampsection_video_closest.n_ms_start;
-                            o_timestampsection_video_closest.n_ms_start = o_timestampsection_video_closest.n_ms_end;
-                            o_timestampsection_video_closest.n_ms_end = n_tmp;
-                        }
-                    }
-                }
+                );             
             }
             o_self.f_try_to_save();
 
@@ -909,20 +904,12 @@ const app = createApp({
         if(o_event.key === "r"){
             // keydown event not triggered when video is in focus
          
-            // add timestamp
-            if(o_self.o_video && o_self.f_b_video_file(o_filemeta.s_path_file_abs)){
-                if(o_filemeta.a_o_timestampsection_video == undefined){
-                    o_filemeta.a_o_timestampsection_video = [];
-                }
-                let o_timestampsection_video_closest = o_self.f_o_timestampsection_video_closest();
-                let nd1 = Math.abs(o_self.n_ms_video - o_timestampsection_video_closest.n_ms_start);
-                let nd2 = Math.abs(o_self.n_ms_video - o_timestampsection_video_closest.n_ms_end);
-                if(nd1 < nd2){
-                    o_timestampsection_video_closest.n_ms_start = null;
-                }else{
-                    o_timestampsection_video_closest.n_ms_end = null;
-                }
+            let o_timestamp_closest = o_self.f_o_timestamp_closest();
+            if(o_timestamp_closest){
+                let n_idx = o_filemeta.a_o_timestamp.indexOf(o_timestamp_closest);
+                o_self.o_filemeta.a_o_timestamp.splice(n_idx, 1);
             }
+
             o_self.f_try_to_save();
 
         }
@@ -939,6 +926,34 @@ const app = createApp({
 
     },
     computed: {
+        'a_o_timestampsection_video': function(){
+            let o_self = this;
+            if( o_self.o_filemeta?.a_o_timestamp == undefined){
+                return []
+            }
+            //sort timestamps by n_ms
+            o_self.o_filemeta.a_o_timestamp = o_self.o_filemeta.a_o_timestamp.sort((o1,o2)=>{
+                return o1.n_ms - o2.n_ms;
+            });
+            let a_o = [];
+            //group all timestamps by two 
+            for(let n_idx = 0; n_idx < o_self.o_filemeta.a_o_timestamp.length; n_idx+=2){
+                let n_ms1 = o_self.o_filemeta.a_o_timestamp[n_idx]?.n_ms;
+                let n_ms2 = o_self.o_filemeta.a_o_timestamp?.[n_idx+1]?.n_ms;
+                if(n_ms2 == undefined){
+                    break;
+                }
+                let o_timestampsection_video = f_o_timestampsection_video(
+                    n_ms1,
+                    n_ms2,
+                );
+                a_o.push(o_timestampsection_video);
+            }
+            if(o_self?.o_filemeta?.a_o_timestampsection_video == undefined){
+                o_self.o_filemeta.a_o_timestampsection_video = a_o
+            }
+            return a_o
+        },
         'a_s_part_from_s_path': function(){
             let o_self = this;
             return [
