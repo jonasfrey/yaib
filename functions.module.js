@@ -216,6 +216,16 @@ let f_s_path_gif_from_video = async function(s_path_file_video){
         "-loop", "0",
         s_path_file_gif
     ];
+    //possible limit file size and fps
+    // const args = [
+    //     "ffmpeg", "-y",
+    //     "-i", s_path_file_video,
+    //     "-vf", "fps=5,scale=1080:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle",
+    //     "-fs", "25M", // Limit file size to 30MB
+    //     "-loop", "0",
+    //     s_path_file_gif
+    // ];
+
     let o = await f_o_command(args);
     console.log(o)
     return s_path_file_gif
