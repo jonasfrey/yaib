@@ -976,9 +976,9 @@ const app = createApp({
                 );
                 a_o.push(o_timestampsection_video);
             }
-            if(o_self?.o_filemeta?.a_o_timestampsection_video == undefined){
-                o_self.o_filemeta.a_o_timestampsection_video = a_o
-            }
+      
+            o_self.o_filemeta.a_o_timestampsection_video = a_o
+            
             return a_o
         },
         'a_s_part_from_s_path': function(){
@@ -1041,14 +1041,14 @@ const app = createApp({
         
         's_path_file_current': async function(){
             let o_self = this;
-            o_self.o_video = document.querySelector('video');
-            if(o_self.o_video){
-
-                await o_self.$nextTick();
+            if(o_self.f_b_video_file(o_self.s_path_file_current)){
                 await o_self.$nextTick();
                 await o_self.$forceUpdate();
+                o_self.o_video = document.querySelector('video');
                 this.b_playing = true; 
                 this.o_video.play();
+                await o_self.$nextTick();
+                await o_self.$forceUpdate();
             }
 
         } 

@@ -5,11 +5,15 @@ let s_path_abs_folder_current = s_path_abs_file_current.split('/').slice(0, -1).
 import { basename,extname } from "https://deno.land/std/path/mod.ts";
 import { ensureFile } from "https://deno.land/std/fs/mod.ts";
 
-let f_a_o_entry__from_s_path = async function (s_path, b_recursive = false) {
+let f_a_o_entry__from_s_path = async function (s_path, b_recursive = false, s_ds = '/') {
   const a_o = [];
+  let s_path_without_ending_slash = s_path.endsWith(s_ds) ? s_path.slice(0, -1) : s_path;
+  // remove multiple directory separators
+  s_path_without_ending_slash = s_path_without_ending_slash.replace(new RegExp(`${s_ds}+`, 'g'), s_ds);
+
   try {
     for await (const o of Deno.readDir(s_path)) {
-      const o2 = { ...o, s_path_folder_parent: s_path, s_path_file: `${s_path}/${o.name}` };
+      const o2 = { ...o, s_path_folder_parent: s_path_without_ending_slash, s_path_file: `${s_path_without_ending_slash}${s_ds}${o.name}` };
       a_o.push(o2);
       if (o.isDirectory && b_recursive) {
         a_o.push(...await f_a_o_entry__from_s_path(o2.s_path_file, b_recursive));
@@ -34,6 +38,8 @@ let f_a_o_entrywithstat__from_s_path= async function(s_path, b_recursive = false
 
 
 let f_o_command = async function(a_s_part) {
+    console.log('running command')
+    console.log(a_s_part.join(' '))
   const [s_program, ...a_s_arg] = a_s_part;
 
   const proc = new Deno.Command(s_program, {
@@ -44,13 +50,16 @@ let f_o_command = async function(a_s_part) {
   });
 
   const { code, stdout, stderr } = await proc.output();
-
-  return {
+  let o =  {
     code,
     success: code === 0,
     stdout: new TextDecoder().decode(stdout),
     stderr: new TextDecoder().decode(stderr),
   };
+  if(o.success === false){
+    throw new Error(""+o.stderr);
+  }
+  return o;
 }
 
 let f_v_objectfromjsonensured = async function(s_path){
@@ -136,18 +145,18 @@ let f_s_path_file_exported_video = async function(
         const args = isMp4
         ? [
             "ffmpeg","-y",
-            "-i", o_filemeta.s_path_file_abs,
+            "-i",o_filemeta.s_path_file_abs,
             "-ss", ss, "-to", to,
             "-map","0:v:0","-map","0:a:0?",
             "-c:v","libx264","-pix_fmt","yuv420p","-preset","fast","-crf","22",
             "-c:a","aac",
             "-movflags","+faststart",
-            s_path_file_new
+           s_path_file_new
             ]
         : [
             "ffmpeg","-y",
             "-ss", ss, "-to", to,
-            "-i", o_filemeta.s_path_file_abs,
+            "-i",o_filemeta.s_path_file_abs,
             "-c","copy",
             s_path_file_new
             ];
@@ -180,7 +189,7 @@ let f_s_path_file_exported_video = async function(
       : [
           "ffmpeg","-y",
           "-f","concat","-safe","0",
-          "-i", s_path_file_list,
+          "-i",s_path_file_list,
           "-c","copy",
           s_path_file_combined_new
         ];
@@ -207,7 +216,8 @@ let f_s_path_gif_from_video = async function(s_path_file_video){
         "-loop", "0",
         s_path_file_gif
     ];
-    await f_o_command(args);
+    let o = await f_o_command(args);
+    console.log(o)
     return s_path_file_gif
 }
 

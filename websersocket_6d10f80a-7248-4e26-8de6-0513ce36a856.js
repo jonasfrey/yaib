@@ -161,8 +161,8 @@ let f_handler = async function(o_request){
                 console.log(o_folderinfo)
                 let a_o = []
                 
-                a_o = await f_a_o_entry__from_s_path(o_folderinfo.s_path_abs.trim(), o_folderinfo.b_recursive);
 
+                a_o = await f_a_o_entry__from_s_path(o_folderinfo.s_path_abs.trim(), o_folderinfo.b_recursive);
 
 
                 o_folderinfo.n_items = a_o.length;
