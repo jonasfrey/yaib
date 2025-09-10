@@ -5,6 +5,34 @@ let s_path_abs_folder_current = s_path_abs_file_current.split('/').slice(0, -1).
 import { basename,extname } from "https://deno.land/std/path/mod.ts";
 import { ensureFile } from "https://deno.land/std/fs/mod.ts";
 
+let f_a_o_entry__from_s_path = async function (s_path, b_recursive = false) {
+  const a_o = [];
+  try {
+    for await (const o of Deno.readDir(s_path)) {
+      const o2 = { ...o, s_path_folder_parent: s_path, s_path_file: `${s_path}/${o.name}` };
+      a_o.push(o2);
+      if (o.isDirectory && b_recursive) {
+        a_o.push(...await f_a_o_entry__from_s_path(o2.s_path_file, b_recursive));
+      }
+    }
+    return a_o;
+  } catch (err) {
+    throw new Error(`f_a_o_entry__from_s_path failed at "${s_path}": ${err.message}`);
+  }
+}
+let f_a_o_entrywithstat__from_s_path= async function(s_path, b_recursive = false){
+    let a_o = await f_a_o_entry__from_s_path(s_path, b_recursive);
+    let a_o_withstat = Promise.all(a_o.map(async(o)=>{
+        let o_stat = await Deno.lstat(o.s_path_file);
+        // o_stat.n_ts_ms_mod = o_stat.mtime ? o_stat.mtime.getTime() : 0;
+        // o_stat.n_ts_ms_cre = o_stat.ctime ? o_stat.ctime.getTime() : 0;
+        console.log(o_stat);
+        return {...o, o_stat}
+    }));
+    return a_o_withstat;
+}
+
+
 let f_o_command = async function(a_s_part) {
   const [s_program, ...a_s_arg] = a_s_part;
 
@@ -189,5 +217,7 @@ export {
     f_save_jsonstrinigfied,
     f_o_command,
     f_s_path_file_exported_video,
-    f_s_path_gif_from_video
+    f_s_path_gif_from_video,
+    f_a_o_entry__from_s_path,
+    f_a_o_entrywithstat__from_s_path
 }

@@ -13,9 +13,6 @@ import {
     f_v_objectfromjsonensured,
     f_save_jsonstrinigfied
 } from "./functions.module.js";
-import {
-    f_a_o_entry__from_s_path
-} from "https://deno.land/x/handyhelpers@5.4.3/mod.js"
 
 let s_path_abs_file_current = new URL(import.meta.url).pathname;
 let s_path_abs_folder_current = s_path_abs_file_current.split('/').slice(0, -1).join('/');
@@ -34,7 +31,9 @@ import {
  
  import {
     f_s_path_file_exported_video,
-    f_s_path_gif_from_video
+    f_s_path_gif_from_video,
+    f_a_o_entrywithstat__from_s_path, 
+    f_a_o_entry__from_s_path,
  } from './functions.module.js';
 
 // const o_kv = await Deno.openKv();
@@ -176,6 +175,12 @@ let f_handler = async function(o_request){
                 o_folderinfo.a_o_entry_folder = a_o.filter(o=>{
                     return o.isFile === false && o.isDirectory === true;
                 });
+                o_folderinfo.a_o_entry_folder = await Promise.all(o_folderinfo.a_o_entry_folder.map(async(o)=>{
+                        let o_stat = await Deno.lstat(o.s_path_file);
+                        o_stat.n_ts_ms_mod = o_stat.mtime ? o_stat.mtime.getTime() : 0;
+                        o_stat.n_ts_ms_cre = o_stat.ctime ? o_stat.ctime.getTime() : 0;
+                        return {...o, o_stat}
+                }));
                 return o_folderinfo
 
             }

@@ -136,6 +136,7 @@ let o_state = reactive({
     s_path_meta_json : `.gitignored.yaib.o_persistantdata.6d10f80a-7248-4e26-8de6-0513ce36a856.1.json`,
     s_loadingstate_info: '',    
     b_select_folder_overlay: false,
+    b_manipulate_filtered_files: false,
     n_id_timeout_saving: null,
     a_o_toast: [],
     b_playing: false,
@@ -196,8 +197,24 @@ let o = await f_o_html_from_o_js(
                         ]
                     },
                     {
+                        a_o: [
+                            {
+                                s_tag: 'button',
+                                //icon that symoblizes that the files that are in the filtered list can be edited or manipulated
+                                innerText: '🛠️',
+                                'v-on:click':"b_manipulate_filtered_files = true;",//move or copy the filtered files 
+                            }, 
+                        ]
+                    },
+                    {
                         class: "overlay select_folder",
-                        'v-if': "b_select_folder_overlay",
+                        'v-if': "b_manipulate_filtered_files",
+                        a_o: [
+                        ]
+                    },
+                    {
+                        class: "overlay select_folder",
+                        'v-if': "b_select_folder_overlay",  
                         a_o: [
                             {
                                 'v-on:click': "b_select_folder_overlay = false;f_load_files();",
@@ -247,7 +264,7 @@ let o = await f_o_html_from_o_js(
                                 class: "folder_list flex_col",
                                 a_o: [
                                     {
-                                        'v-for': 'o_folder of o_folderinfo?.a_o_entry_folder',
+                                        'v-for': 'o_folder of f_a_o_entry_with_stat_sorted(o_folderinfo?.a_o_entry_folder)',
                                         s_tag: "a",
                                         href: "#",
                                         innerText: "📂{{o_folder.name}}",
@@ -552,6 +569,12 @@ const app = createApp({
         window.removeEventListener('pointermove', this.f_pointermove);
     },
   methods: {
+    f_a_o_entry_with_stat_sorted: function(a_o){
+        if(Array.isArray(a_o) == false){return [];}
+        return a_o.sort((o1,o2)=>{
+            return o2?.o_stat?.n_ts_ms_mod - o1?.o_stat?.n_ts_ms_mod
+        }) || [];
+    },
     f_a_s_part_from_s_path: f_a_s_part_from_s_path,
     f_filter_timestampsection: function(){
         let o_self = this;
@@ -912,6 +935,10 @@ const app = createApp({
 
             o_self.f_try_to_save();
 
+        }
+        if(o_event.key === "Escape"){
+            o_self.b_select_folder_overlay = false;
+            o_self.b_show_settings = false;
         }
 
     },
